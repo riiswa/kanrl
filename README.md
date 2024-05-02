@@ -12,14 +12,24 @@ For more information about this novel architecture please visit:
 
 ## Experimentation
 
-The implementation of Kolmogorov-Arnold Q-Network (KAQN) offers a promising avenue in reinforcement learning (RL). In this project, we replace the Multi-Layer Perceptron (MLP) component of Deep Q-Networks (DQN) with the Kolmogorov-Arnold Network (KAN). Furthermore, we employ the Double Deep Q-Network (DDQN) update rule to enhance stability and learning efficiency. Initial experiments conducted with KAQN demonstrate its potential in RL tasks. However, challenges persist in effectively applying KAQN to solve the CartPole environment. One such challenge revolves around determining the optimal hyperparameters for this specific setting.
-The following plot shows Epsisode length evolution during training on CartPole-v1, over 500 episodes.
+The implementation of Kolmogorov-Arnold Q-Network (KAQN) offers a promising avenue in reinforcement learning. In this project, we replace the Multi-Layer Perceptron (MLP) component of Deep Q-Networks (DQN) with the Kolmogorov-Arnold Network (KAN). Furthermore, we employ the Double Deep Q-Network (DDQN) update rule to enhance stability and learning efficiency. Initial experiments conducted with KAQN demonstrate its potential in RL tasks. However, challenges persist in effectively applying KAQN to solve the CartPole environment. One such challenge revolves around determining the optimal hyperparameters for this specific setting.
 
-<img style="background-color: white" alt="Epsisode length evolution during training on CartPole-v1" src="https://raw.githubusercontent.com/riiswa/kanrl/main/plot.png">
+The following plot compare `DDQN` implementation with `KAN` and the classical `MLP` on the CartPole-v1 environment for 500 episodes (with 50 warm-ups episodes).
+
+<center>
+<img style="background-color: white" alt="Epsisode length evolution during training on CartPole-v1" src="https://raw.githubusercontent.com/riiswa/kanrl/main/first_result_one_seed.png">
+</center>
+
+### TODO
+
+- Find better hyperparameters for KAN to enhance performance and convergence speed.
+- Run experiments on multiple seeds to assess the robustness and stability of KAN across different initializations.
+- Explore other environments beyond CartPole to evaluate the generalizability and applicability of KAN in diverse RL tasks.
+
 
 ## Installation
 
-The implementation is minimal (< 200 lines of codes), is only require `gymnasium`, `torch`, `numpy` and `pykan`, that can be installed via `pip install -r rwquirements.txt`.
+The implementation is minimal (< 200 lines of codes), is only require `gymnasium`, `torch`, `numpy` and `pykan`, that can be installed via `pip install -r requirements.txt`.
 
 ## Contributing
 

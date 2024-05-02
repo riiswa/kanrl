@@ -1,13 +1,18 @@
 import argparse
+import os
+import time
 from typing import Literal
 
 import gymnasium as gym
 import torch
 import torch.nn as nn
 from kan import KAN
+from torch.nn import init
 from torch.utils.tensorboard import SummaryWriter
 
 from buffer import ReplayBuffer
+
+import csv
 
 
 def kan_train(
@@ -125,7 +130,7 @@ if __name__ == "__main__":
         help="Frequency of updating target network",
     )
     parser.add_argument(
-        "--learning_rate", type=float, default=0.001, help="Learning rate for optimizer"
+        "--learning_rate", type=float, default=0.0005, help="Learning rate for optimizer"
     )
     parser.add_argument(
         "--replay_buffer_capacity",
@@ -134,9 +139,9 @@ if __name__ == "__main__":
         help="Capacity of the replay buffer",
     )
     parser.add_argument(
-        "--width", type=int, default=5, help="KAN width of the hidden layer"
+        "--width", type=int, default=8, help="Width of the hidden layer"
     )
-    parser.add_argument("--grid", type=int, default=3, help="KAN grid hyperparameter")
+    parser.add_argument("--grid", type=int, default=5, help="KAN grid hyperparameter")
     parser.add_argument("--method", type=str, default="KAN", help="Wether to use MLP or KAN")
     args = parser.parse_args()
 
@@ -146,29 +151,35 @@ if __name__ == "__main__":
             width=[env.observation_space.shape[0], args.width, env.action_space.n],
             grid=args.grid,
             k=3,
-            # bias_trainable=False,
-            # sp_trainable=False,
-            # sb_trainable=False,
+            bias_trainable=False,
+            sp_trainable=False,
+            sb_trainable=False,
         )
         target_network = KAN(
             width=[env.observation_space.shape[0], args.width, env.action_space.n],
             grid=args.grid,
             k=3,
-            # bias_trainable=False,
-            # sp_trainable=False,
-            # sb_trainable=False,
+            bias_trainable=False,
+            sp_trainable=False,
+            sb_trainable=False,
         )
         train = kan_train
     elif args.method == "MLP":
+        def init_weights(m):
+            if isinstance(m, nn.Linear):
+                init.orthogonal_(m.weight, gain=init.calculate_gain('relu'))  # Initialize weights orthogonally
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)  # Set bias to zero if present
         q_network = nn.Sequential(
-            nn.Linear(env.observation_space.shape[0], 32),
+            nn.Linear(env.observation_space.shape[0], args.width),
             nn.ReLU(),
-            nn.Linear(32, env.action_space.n)
+            nn.Linear(args.width, env.action_space.n)
         )
+        q_network.apply(init_weights)
         target_network = nn.Sequential(
-            nn.Linear(env.observation_space.shape[0], 32),
+            nn.Linear(env.observation_space.shape[0], args.width),
             nn.ReLU(),
-            nn.Linear(32, env.action_space.n)
+            nn.Linear(args.width, env.action_space.n)
         )
         train = mlp_train
     else:
@@ -176,7 +187,13 @@ if __name__ == "__main__":
 
     target_network.load_state_dict(q_network.state_dict())
 
-    writer = SummaryWriter()
+    run_name = f"{args.method}__{int(time.time())}"
+
+    writer = SummaryWriter(f"runs/{run_name}")
+
+    os.makedirs("results", exist_ok=True)
+    with open(f"results/{run_name}.csv", "w") as f:
+        f.write("episode,length\n")
 
     optimizer = torch.optim.Adam(q_network.parameters(), args.learning_rate)
     buffer = ReplayBuffer(args.replay_buffer_capacity, env.observation_space.shape[0])
@@ -211,6 +228,8 @@ if __name__ == "__main__":
             observation = next_observation
             finished = terminated or truncated
             episode_length += 1
+        with open(f"results/{run_name}.csv", "a") as f:
+            f.write(f"{episode},{episode_length}\n")
         if len(buffer) >= args.batch_size:
             for _ in range(args.train_steps):
                 loss = train(
@@ -223,8 +242,9 @@ if __name__ == "__main__":
             print(f"Episode: {episode}, Loss: {loss}, Episode Length: {episode_length}")
             writer.add_scalar("episode_length", episode_length, episode)
             writer.add_scalar("loss", loss, episode)
-            if episode % 25 == 0 and args.method == "KAN":
+            if episode % 25 == 0 and args.method == "KAN" and episode < int(args.n_episodes * (1/2)):
                 q_network.update_grid_from_samples(buffer.observations[:len(buffer)])
+                target_network.update_grid_from_samples(buffer.observations[:len(buffer)])
 
             if episode % args.target_update_freq == 0:
                 target_network.load_state_dict(q_network.state_dict())
