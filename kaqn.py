@@ -1,4 +1,5 @@
 import argparse
+from typing import Literal
 
 import gymnasium as gym
 import torch
@@ -9,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from buffer import ReplayBuffer
 
 
-def train(
+def kan_train(
     net,
     target,
     data,
@@ -69,6 +70,32 @@ def train(
     return loss.item()
 
 
+def mlp_train(
+    net,
+    target,
+    data,
+    optimizer,
+    gamma=0.99,
+):
+    observations, actions, next_observations, rewards, terminations = data
+
+    with torch.no_grad():
+        next_q_values = net(next_observations)
+        next_actions = next_q_values.argmax(dim=1)
+        next_q_values_target = target(next_observations)
+        target_max = next_q_values_target[range(len(next_q_values)), next_actions]
+        td_target = rewards.flatten() + gamma * target_max * (
+            1 - terminations.flatten()
+        )
+
+    old_val = net(observations).gather(1, actions).squeeze()
+    loss = nn.functional.mse_loss(td_target, old_val)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    return loss.item()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Arguments for training Kolmogorov-Arnold Q-Network (KAQN) agent on CartPole-v1"
@@ -109,31 +136,49 @@ if __name__ == "__main__":
     parser.add_argument(
         "--width", type=int, default=5, help="KAN width of the hidden layer"
     )
-    parser.add_argument("--grid", type=int, default=100, help="KAN grid hyperparameter")
+    parser.add_argument("--grid", type=int, default=3, help="KAN grid hyperparameter")
+    parser.add_argument("--method", type=str, default="KAN", help="Wether to use MLP or KAN")
     args = parser.parse_args()
 
     env = gym.make("CartPole-v1")
-    ka_q_network = KAN(
-        width=[env.observation_space.shape[0], 5, env.action_space.n],
-        grid=args.grid,
-        k=args.width,
-        bias_trainable=False,
-        sp_trainable=False,
-        sb_trainable=False,
-    )
-    target_network = KAN(
-        width=[env.observation_space.shape[0], 5, env.action_space.n],
-        grid=args.grid,
-        k=args.width,
-        bias_trainable=False,
-        sp_trainable=False,
-        sb_trainable=False,
-    )
-    target_network.load_state_dict(ka_q_network.state_dict())
+    if args.method == "KAN":
+        q_network = KAN(
+            width=[env.observation_space.shape[0], args.width, env.action_space.n],
+            grid=args.grid,
+            k=3,
+            # bias_trainable=False,
+            # sp_trainable=False,
+            # sb_trainable=False,
+        )
+        target_network = KAN(
+            width=[env.observation_space.shape[0], args.width, env.action_space.n],
+            grid=args.grid,
+            k=3,
+            # bias_trainable=False,
+            # sp_trainable=False,
+            # sb_trainable=False,
+        )
+        train = kan_train
+    elif args.method == "MLP":
+        q_network = nn.Sequential(
+            nn.Linear(env.observation_space.shape[0], 32),
+            nn.ReLU(),
+            nn.Linear(32, env.action_space.n)
+        )
+        target_network = nn.Sequential(
+            nn.Linear(env.observation_space.shape[0], 32),
+            nn.ReLU(),
+            nn.Linear(32, env.action_space.n)
+        )
+        train = mlp_train
+    else:
+        raise Exception(f"Method {args.method} don't exist, choose between MLP and KAN." )
+
+    target_network.load_state_dict(q_network.state_dict())
 
     writer = SummaryWriter()
 
-    optimizer = torch.optim.Adam(ka_q_network.parameters(), args.learning_rate)
+    optimizer = torch.optim.Adam(q_network.parameters(), args.learning_rate)
     buffer = ReplayBuffer(args.replay_buffer_capacity, env.observation_space.shape[0])
 
     writer.add_text(
@@ -152,7 +197,7 @@ if __name__ == "__main__":
                 action = env.action_space.sample()
             else:
                 action = (
-                    ka_q_network(observation.unsqueeze(0))
+                    q_network(observation.unsqueeze(0).double())
                     .argmax(axis=-1)
                     .squeeze()
                     .item()
@@ -169,7 +214,7 @@ if __name__ == "__main__":
         if len(buffer) >= args.batch_size:
             for _ in range(args.train_steps):
                 loss = train(
-                    ka_q_network,
+                    q_network,
                     target_network,
                     buffer.sample(args.batch_size),
                     optimizer,
@@ -178,5 +223,8 @@ if __name__ == "__main__":
             print(f"Episode: {episode}, Loss: {loss}, Episode Length: {episode_length}")
             writer.add_scalar("episode_length", episode_length, episode)
             writer.add_scalar("loss", loss, episode)
+            if episode % 25 == 0 and args.method == "KAN":
+                q_network.update_grid_from_samples(buffer.observations[:len(buffer)])
+
             if episode % args.target_update_freq == 0:
-                target_network.load_state_dict(ka_q_network.state_dict())
+                target_network.load_state_dict(q_network.state_dict())
