@@ -24,10 +24,6 @@ The following plot compare DDQN implementation with KAN (width=8) and the classi
 - **Next Steps**: Further investigation is warranted to select more suitable hyperparameters. It's possible that KAQN encounters challenges with the non-stationary nature of value function approximation. Consider exploring alternative configurations or adapting KAQN for policy learning.
 - **Performance Comparison**: It's noteworthy that KAQN operates notably slower than DQN, with over a 10x difference in speed, despite having fewer parameters. This applies to both inference and training phases.
 
-## Installation
-
-The implementation is minimal (< 200 lines of codes), is only require `gymnasium`, `torch`, `numpy` and `pykan`, that can be installed via `pip install -r requirements.txt`.
-
 ## Contributing
 
 I welcome the community to enhance this project. There are plenty of opportunities to contribute, like hyperparameters search, benchmark with classic DQN, implementation of others algorithm (REINFORCE, A2C, etc...) and additional environment support.
