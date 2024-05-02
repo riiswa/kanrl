@@ -14,18 +14,15 @@ For more information about this novel architecture please visit:
 
 The implementation of Kolmogorov-Arnold Q-Network (KAQN) offers a promising avenue in reinforcement learning. In this project, we replace the Multi-Layer Perceptron (MLP) component of Deep Q-Networks (DQN) with the Kolmogorov-Arnold Network (KAN). Furthermore, we employ the Double Deep Q-Network (DDQN) update rule to enhance stability and learning efficiency. Initial experiments conducted with KAQN demonstrate its potential in RL tasks. However, challenges persist in effectively applying KAQN to solve the CartPole environment. One such challenge revolves around determining the optimal hyperparameters for this specific setting.
 
-The following plot compare `DDQN` implementation with `KAN` and the classical `MLP` on the CartPole-v1 environment for 500 episodes (with 50 warm-ups episodes).
+The following plot compare DDQN implementation with KAN (width=8) and the classical MLP (width=32) on the `CartPole-v1` environment for 500 episodes on 32 seeds (with 50 warm-ups episodes).
 
 <center>
-<img style="background-color: white" alt="Epsisode length evolution during training on CartPole-v1" src="https://raw.githubusercontent.com/riiswa/kanrl/main/first_result_one_seed.png">
+<img alt="Epsisode length evolution during training on CartPole-v1" src="https://raw.githubusercontent.com/riiswa/kanrl/main/cartpole_results.png">
 </center>
 
-### TODO
-
-- Find better hyperparameters for KAN to enhance performance and convergence speed.
-- Run experiments on multiple seeds to assess the robustness and stability of KAN across different initializations.
-- Explore other environments beyond CartPole to evaluate the generalizability and applicability of KAN in diverse RL tasks.
-
+- **Observation**: KAQN exhibits unstable learning and struggles to solve `CartPole-v1` across multiple seeds with the current hyperparameters (refer to `config.yaml`).
+- **Next Steps**: Further investigation is warranted to select more suitable hyperparameters. It's possible that KAQN encounters challenges with the non-stationary nature of value function approximation. Consider exploring alternative configurations or adapting KAQN for policy learning.
+- **Performance Comparison**: It's noteworthy that KAQN operates notably slower than DQN, with over a 10x difference in speed, despite having fewer parameters. This applies to both inference and training phases.
 
 ## Installation
 
