@@ -15,7 +15,7 @@ For more information about this novel architecture please visit:
 The implementation of Kolmogorov-Arnold Q-Network (KAQN) offers a promising avenue in reinforcement learning (RL). In this project, we replace the Multi-Layer Perceptron (MLP) component of Deep Q-Networks (DQN) with the Kolmogorov-Arnold Network (KAN). Furthermore, we employ the Double Deep Q-Network (DDQN) update rule to enhance stability and learning efficiency. Initial experiments conducted with KAQN demonstrate its potential in RL tasks. However, challenges persist in effectively applying KAQN to solve the CartPole environment. One such challenge revolves around determining the optimal hyperparameters for this specific setting.
 The following plot shows Epsisode length evolution during training on CartPole-v1, over 500 episodes.
 
-<img style="background-color: white" alt="Epsisode length evolution during training on CartPole-v1" src="https://github.com/riiswa/kanrl/plot.png">
+<img style="background-color: white" alt="Epsisode length evolution during training on CartPole-v1" src="https://raw.githubusercontent.com/riiswa/kanrl/main/plot.png">
 
 ## Installation
 
