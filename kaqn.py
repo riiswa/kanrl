@@ -1,18 +1,19 @@
-import argparse
 import os
 import time
-from typing import Literal
+import random
 
 import gymnasium as gym
 import torch
 import torch.nn as nn
+from hydra.core.hydra_config import HydraConfig
 from kan import KAN
-from torch.nn import init
 from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 
 from buffer import ReplayBuffer
-
-import csv
+import hydra
+from omegaconf import DictConfig
+from tqdm import tqdm
 
 
 def kan_train(
@@ -101,93 +102,57 @@ def mlp_train(
     return loss.item()
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Arguments for training Kolmogorov-Arnold Q-Network (KAQN) agent on CartPole-v1"
-    )
-    parser.add_argument(
-        "--batch_size", type=int, default=256, help="Batch size for training"
-    )
-    parser.add_argument(
-        "--n_episodes", type=int, default=500, help="Number of episodes for training"
-    )
-    parser.add_argument(
-        "--warm_up_episodes", type=int, default=50, help="Number of warm-up episodes"
-    )
-    parser.add_argument(
-        "--gamma", type=float, default=0.99, help="Discount factor for future rewards"
-    )
-    parser.add_argument(
-        "--train_steps",
-        type=int,
-        default=5,
-        help="Number of training steps per episode",
-    )
-    parser.add_argument(
-        "--target_update_freq",
-        type=int,
-        default=10,
-        help="Frequency of updating target network",
-    )
-    parser.add_argument(
-        "--learning_rate", type=float, default=0.0005, help="Learning rate for optimizer"
-    )
-    parser.add_argument(
-        "--replay_buffer_capacity",
-        type=int,
-        default=10000,
-        help="Capacity of the replay buffer",
-    )
-    parser.add_argument(
-        "--width", type=int, default=8, help="Width of the hidden layer"
-    )
-    parser.add_argument("--grid", type=int, default=5, help="KAN grid hyperparameter")
-    parser.add_argument("--method", type=str, default="KAN", help="Wether to use MLP or KAN")
-    args = parser.parse_args()
+def set_all_seeds(seed):
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
 
-    env = gym.make("CartPole-v1")
-    if args.method == "KAN":
+
+@hydra.main(config_path=".", config_name="config", version_base=None)
+def main(config: DictConfig):
+    set_all_seeds(config.seed)
+    env = gym.make(config.env_id)
+    if config.method == "KAN":
         q_network = KAN(
-            width=[env.observation_space.shape[0], args.width, env.action_space.n],
-            grid=args.grid,
+            width=[env.observation_space.shape[0], config.width, env.action_space.n],
+            grid=config.grid,
             k=3,
             bias_trainable=False,
             sp_trainable=False,
             sb_trainable=False,
         )
         target_network = KAN(
-            width=[env.observation_space.shape[0], args.width, env.action_space.n],
-            grid=args.grid,
+            width=[env.observation_space.shape[0], config.width, env.action_space.n],
+            grid=config.grid,
             k=3,
             bias_trainable=False,
             sp_trainable=False,
             sb_trainable=False,
         )
         train = kan_train
-    elif args.method == "MLP":
-        def init_weights(m):
-            if isinstance(m, nn.Linear):
-                init.orthogonal_(m.weight, gain=init.calculate_gain('relu'))  # Initialize weights orthogonally
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)  # Set bias to zero if present
+    elif config.method == "MLP":
         q_network = nn.Sequential(
-            nn.Linear(env.observation_space.shape[0], args.width),
+            nn.Linear(env.observation_space.shape[0], config.width),
             nn.ReLU(),
-            nn.Linear(args.width, env.action_space.n)
+            nn.Linear(config.width, env.action_space.n),
         )
-        q_network.apply(init_weights)
         target_network = nn.Sequential(
-            nn.Linear(env.observation_space.shape[0], args.width),
+            nn.Linear(env.observation_space.shape[0], config.width),
             nn.ReLU(),
-            nn.Linear(args.width, env.action_space.n)
+            nn.Linear(config.width, env.action_space.n),
         )
         train = mlp_train
     else:
-        raise Exception(f"Method {args.method} don't exist, choose between MLP and KAN." )
+        raise Exception(
+            f"Method {config.method} don't exist, choose between MLP and KAN."
+        )
 
     target_network.load_state_dict(q_network.state_dict())
 
-    run_name = f"{args.method}__{int(time.time())}"
+    run_name = f"{config.method}_{config.env_id}_{config.seed}_{int(time.time())}"
 
     writer = SummaryWriter(f"runs/{run_name}")
 
@@ -195,22 +160,24 @@ if __name__ == "__main__":
     with open(f"results/{run_name}.csv", "w") as f:
         f.write("episode,length\n")
 
-    optimizer = torch.optim.Adam(q_network.parameters(), args.learning_rate)
-    buffer = ReplayBuffer(args.replay_buffer_capacity, env.observation_space.shape[0])
+    optimizer = torch.optim.Adam(q_network.parameters(), config.learning_rate)
+    buffer = ReplayBuffer(config.replay_buffer_capacity, env.observation_space.shape[0])
 
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|-|-|\n%s"
-        % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
+        % ("\n".join([f"|{key}|{value}|" for key, value in vars(config).items()])),
     )
 
-    for episode in range(args.n_episodes):
+    pbar_position = 0 if HydraConfig.get().mode == HydraConfig.get().mode.RUN else HydraConfig.get().job.num
+
+    for episode in tqdm(range(config.n_episodes), desc=f"{run_name}", position=pbar_position):
         observation, info = env.reset()
         observation = torch.from_numpy(observation)
         finished = False
         episode_length = 0
         while not finished:
-            if episode < args.warm_up_episodes:
+            if episode < config.warm_up_episodes:
                 action = env.action_space.sample()
             else:
                 action = (
@@ -220,7 +187,8 @@ if __name__ == "__main__":
                     .item()
                 )
             next_observation, reward, terminated, truncated, info = env.step(action)
-            reward = -1 if terminated else 0
+            if config.env_id == "CartPole-v1":
+                reward = -1 if terminated else 0
             next_observation = torch.from_numpy(next_observation)
 
             buffer.add(observation, action, next_observation, reward, terminated)
@@ -230,21 +198,30 @@ if __name__ == "__main__":
             episode_length += 1
         with open(f"results/{run_name}.csv", "a") as f:
             f.write(f"{episode},{episode_length}\n")
-        if len(buffer) >= args.batch_size:
-            for _ in range(args.train_steps):
+        if len(buffer) >= config.batch_size:
+            for _ in range(config.train_steps):
                 loss = train(
                     q_network,
                     target_network,
-                    buffer.sample(args.batch_size),
+                    buffer.sample(config.batch_size),
                     optimizer,
-                    args.gamma,
+                    config.gamma,
                 )
-            print(f"Episode: {episode}, Loss: {loss}, Episode Length: {episode_length}")
             writer.add_scalar("episode_length", episode_length, episode)
             writer.add_scalar("loss", loss, episode)
-            if episode % 25 == 0 and args.method == "KAN" and episode < int(args.n_episodes * (1/2)):
-                q_network.update_grid_from_samples(buffer.observations[:len(buffer)])
-                target_network.update_grid_from_samples(buffer.observations[:len(buffer)])
+            if (
+                episode % 25 == 0
+                and config.method == "KAN"
+                and episode < int(config.n_episodes * (1 / 2))
+            ):
+                q_network.update_grid_from_samples(buffer.observations[: len(buffer)])
+                target_network.update_grid_from_samples(
+                    buffer.observations[: len(buffer)]
+                )
 
-            if episode % args.target_update_freq == 0:
+            if episode % config.target_update_freq == 0:
                 target_network.load_state_dict(q_network.state_dict())
+
+
+if __name__ == "__main__":
+    main()
