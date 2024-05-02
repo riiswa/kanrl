@@ -1,0 +1,4 @@
+gymnasium~=0.29.1
+torch~=2.2.2
+numpy~=1.26.4
+pykan~=0.0.2
