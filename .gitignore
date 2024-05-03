@@ -1,2 +1,9 @@
 venv/
-test.ipynb
+.DS_Store
+.idea/
+__pycache__/
+multirun/
+outputs/
+results/
+runs/
+figures/
