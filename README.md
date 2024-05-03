@@ -16,13 +16,16 @@ The implementation of Kolmogorov-Arnold Q-Network (KAQN) offers a promising aven
 
 The following plot compare DDQN implementation with KAN (width=8) and the classical MLP (width=32) on the `CartPole-v1` environment for 500 episodes on 32 seeds (with 50 warm-ups episodes).
 
-<center>
 <img alt="Epsisode length evolution during training on CartPole-v1" src="https://raw.githubusercontent.com/riiswa/kanrl/main/cartpole_results.png">
-</center>
+
+The following plot displays the interpretable policy learned by KAQN during a successful training session.
+
+<img alt="Interpretable policy for CartPole" src="https://raw.githubusercontent.com/riiswa/kanrl/main/policy.png">
 
 - **Observation**: KAQN exhibits unstable learning and struggles to solve `CartPole-v1` across multiple seeds with the current hyperparameters (refer to `config.yaml`).
 - **Next Steps**: Further investigation is warranted to select more suitable hyperparameters. It's possible that KAQN encounters challenges with the non-stationary nature of value function approximation. Consider exploring alternative configurations or adapting KAQN for policy learning.
 - **Performance Comparison**: It's noteworthy that KAQN operates notably slower than DQN, with over a 10x difference in speed, despite having fewer parameters. This applies to both inference and training phases.
+- **Interpretable Policy**: The learned policy with KANs is more interpretable than MLP, I'm currently working on extraction on interpretable policy...
 
 ## Contributing
 
