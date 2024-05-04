@@ -1,57 +1,121 @@
+import glob
 import os
+import pickle
 
 import torch
 import numpy as np
 import gymnasium as gym
+from huggingface_hub.utils import EntryNotFoundError
 from huggingface_sb3 import load_from_hub
-
-from stable_baselines3 import PPO, A2C, TD3
+from moviepy.video.compositing.concatenate import concatenate_videoclips
+from moviepy.video.io.VideoFileClip import VideoFileClip
+from rl_zoo3 import ALGOS
 from gymnasium.wrappers import RecordVideo
+from stable_baselines3.common.running_mean_std import RunningMeanStd
 
-ALGOS = {"ppo": PPO, "a2c": A2C, "td3": TD3}
+
+class NormalizeObservation(gym.Wrapper):
+    def __init__(self, env: gym.Env, clip_obs: float, obs_rms: RunningMeanStd, epsilon: float):
+        gym.Wrapper.__init__(self, env)
+        self.clip_obs = clip_obs
+        self.obs_rms = obs_rms
+        self.epsilon = epsilon
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        observation = self.normalize(np.array([observation]))[0]
+        return observation, reward, terminated, truncated, info
+
+    def reset(self, **kwargs):
+        observation, info = self.env.reset(**kwargs)
+        return self.normalize(np.array([observation]))[0], info
+
+    def normalize(self, obs):
+        return np.clip((obs - self.obs_rms.mean) / np.sqrt(self.obs_rms.var + self.epsilon), -self.clip_obs, self.clip_obs)
+
+
+class CreateDataset(gym.Wrapper):
+    def __init__(self, env: gym.Env):
+        gym.Wrapper.__init__(self, env)
+        self.observations = []
+        self.actions = []
+        self.last_observation = None
+
+    def step(self, action):
+        self.observations.append(self.last_observation)
+        self.actions.append(action)
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        self.last_observation = observation
+        return observation, reward, terminated, truncated, info
+
+    def reset(self, **kwargs):
+        observation, info = self.env.reset(**kwargs)
+        self.last_observation = observation
+        return observation, info
+
+    def get_dataset(self):
+        if isinstance(self.env.action_space, gym.spaces.Box) and self.env.action_space.shape != (1,):
+            actions = np.vstack(self.actions)
+        else:
+            actions = np.hstack(self.actions)
+        return np.vstack(self.observations), actions
 
 
 def rollouts(env, policy, num_episodes=1):
-    observations = []
-    actions = []
-
     for episode in range(num_episodes):
         done = False
         observation, _ = env.reset()
         while not done:
             action = policy(observation)
-            observations.append(observation)
-            actions.append(action)
             observation, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
     env.close()
 
-    observations = np.vstack(observations)
-    actions = np.hstack(actions)
-    if actions.ndim == 1:
-        actions = actions[:, None]
-    return observations, actions
 
-
-def generate_dataset_from_expert(algo, env_name, num_train_episodes=90, num_test_episodes=10, force=False):
+def generate_dataset_from_expert(algo, env_name, num_train_episodes=5, num_test_episodes=2, force=False):
+    if env_name == "Swimmer-v4":
+        env_name = "Swimmer-v3"
+    elif env_name == "Hopper-v4":
+        env_name = "Hopper-v3"
     dataset_path = os.path.join("datasets", f"{algo}-{env_name}.pt")
-    if os.path.exists(dataset_path) and not force:
-        return
+    video_path = os.path.join("videos", f"{algo}-{env_name}.mp4")
+    if os.path.exists(dataset_path) and os.path.exists(video_path) and not force:
+        return dataset_path, video_path
     repo_id = f"sb3/{algo}-{env_name}"
     policy_file = f"{algo}-{env_name}.zip"
 
-    checkpoint = load_from_hub(repo_id, policy_file)
+    expert_path = load_from_hub(repo_id, policy_file)
+    try:
+        vec_normalize_path = load_from_hub(repo_id, "vec_normalize.pkl")
+        with open(vec_normalize_path, "rb") as f:
+            vec_normalize = pickle.load(f)
+            if vec_normalize.norm_obs:
+                vec_normalize_params = {"clip_obs": vec_normalize.clip_obs, "obs_rms": vec_normalize.obs_rms, "epsilon": vec_normalize.epsilon}
+            else:
+                vec_normalize_params = None
+    except EntryNotFoundError:
+        vec_normalize_params = None
 
-    expert = ALGOS[algo].load(checkpoint)
+    expert = ALGOS[algo].load(expert_path)
     train_env = gym.make(env_name)
+    train_env = CreateDataset(train_env)
+    if vec_normalize_params is not None:
+        train_env = NormalizeObservation(train_env, **vec_normalize_params)
     test_env = gym.make(env_name, render_mode="rgb_array")
+    test_env = CreateDataset(test_env)
+    if vec_normalize_params is not None:
+        test_env = NormalizeObservation(test_env, **vec_normalize_params)
     test_env = RecordVideo(test_env, video_folder="videos", episode_trigger=lambda x: True, name_prefix=f"{algo}-{env_name}")
 
     def policy(obs):
         return expert.predict(obs, deterministic=True)[0]
 
-    train_observations, train_actions = rollouts(train_env, policy, num_train_episodes)
-    test_observations, test_actions = rollouts(test_env, policy, num_test_episodes)
+    os.makedirs("videos", exist_ok=True)
+    rollouts(train_env, policy, num_train_episodes)
+    rollouts(test_env, policy, num_test_episodes)
+
+    train_observations, train_actions = train_env.get_dataset()
+    test_observations, test_actions = test_env.get_dataset()
 
     dataset = {
         "train_input": torch.from_numpy(train_observations),
@@ -63,6 +127,13 @@ def generate_dataset_from_expert(algo, env_name, num_train_episodes=90, num_test
     os.makedirs("datasets", exist_ok=True)
     torch.save(dataset, dataset_path)
 
+    video_files = glob.glob(os.path.join("videos", f"{algo}-{env_name}-episode*.mp4"))
+    clips = [VideoFileClip(file) for file in video_files]
+    final_clip = concatenate_videoclips(clips)
+    final_clip.write_videofile(video_path, codec="libx264", fps=24)
+
+    return dataset_path, video_path
+
 
 if __name__ == "__main__":
-    generate_dataset_from_expert("ppo", "CartPole-v1")
+    generate_dataset_from_expert("ppo", "CartPole-v1", force=True)
