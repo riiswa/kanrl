@@ -34,6 +34,8 @@ In this demo, we showcase a method to make a trained Reinforcement Learning (RL)
 
 For more information about KAN you can read the [paper](https://arxiv.org/abs/2404.19756), and check the [PyTorch official information](https://github.com/KindXiaoming/pykan).
 To follow the progress of KAN in RL you can check the repo [kanrl](https://github.com/riiswa/kanrl).
+
+[![riiswa/kanrl - GitHub](https://gh-card.dev/repos/riiswa/kanrl.svg)](https://github.com/riiswa/kanrl)
 """
 
 envs = ["CartPole-v1", "MountainCar-v0", "Acrobot-v1", "Pendulum-v1", "MountainCarContinuous-v0", "LunarLander-v2", "Swimmer-v3", "Hopper-v3"]
