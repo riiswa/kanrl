@@ -15,38 +15,33 @@ def extract_dim(space: gym.Space):
 
 
 class InterpretablePolicyExtractor:
+    lib = ['x', 'x^2', 'x^3', 'x^4', 'exp', 'log', 'sqrt', 'tanh', 'sin', 'abs']
 
-    def __init__(self, env_id: str, hidden_widths: Optional[Tuple[int]]=None):
-        self.env = gym.make(env_id)
+    def __init__(self, env_name: str, hidden_widths: Optional[Tuple[int]]=None):
+        self.env = gym.make(env_name)
         if hidden_widths is None:
             hidden_widths = []
         observation_dim, self._observation_is_discrete = extract_dim(self.env.observation_space)
         action_dim, self._action_is_discrete = extract_dim(self.env.action_space)
         self.policy = KAN(width=[observation_dim, *hidden_widths, action_dim])
-        self.symbolic_policy = None
         self.loss_fn = torch.nn.MSELoss() if not self._action_is_discrete else torch.nn.CrossEntropyLoss()
 
-    def _regression_accuracy(self, prefix, dataset: Dict[str, torch.Tensor]):
-        return lambda: torch.mean(((self.policy(dataset[prefix + '_input']) - dataset[prefix + '_label']) ** 2).float())
+    def train_from_dataset(self, dataset: Union[Dict[str, torch.Tensor], str], steps: int = 20):
+        if isinstance(dataset, str):
+            dataset = torch.load(dataset)
+        if dataset["train_label"].ndim == 1 and not self._action_is_discrete:
+            dataset["train_label"] = dataset["train_label"][:, None]
+        if dataset["train_label"].ndim == 1 and not self._action_is_discrete:
+            dataset["test_label"] = dataset["test_label"][:, None]
+        return self.policy.train(dataset, opt="LBFGS", steps=steps, loss_fn=self.loss_fn)
 
-    def _classification_accuracy(self, prefix, dataset: Dict[str, torch.Tensor]):
-        return lambda: torch.mean(
-            (self.policy(dataset[prefix + '_input']).argmax(dim=-1) == dataset[prefix + '_label']).float())
-
-    def train_from_dataset(self, dataset: Dict[str, torch.Tensor], steps: int = 20):
+    def forward(self, observation):
+        observation = torch.from_numpy(observation)
+        action = self.policy(observation.unsqueeze(0))
         if self._action_is_discrete:
-            train_acc = self._classification_accuracy("train", dataset)
-            test_acc = self._classification_accuracy("test", dataset)
+            return action.argmax(axis=-1).squeeze().item()
         else:
-            train_acc = self._regression_accuracy("train", dataset)
-            test_acc = self._regression_accuracy("test", dataset)
-        results = self.policy.train(dataset, opt="LBFGS", steps=steps, loss_fn=self.loss_fn, metrics=(train_acc, test_acc))
-
-        return results['train_acc'], results['test_acc']
-
-    def plot(self):
-        self.policy.prune()
-        self.policy.plot(mask=True)
+            return action.squeeze(0).detach().numpy()
 
     def train_from_policy(self, policy: Callable[[np.ndarray], Union[np.ndarray, int, float]], steps: int):
         raise NotImplementedError()  # TODO
