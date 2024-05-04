@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import torch
 
 import gradio as gr
+import sys
 
 intro = """
 # Making RL Policy Interpretable with Kolmogorov-Arnold Network 🧠 ➙ 🔢
@@ -38,6 +39,30 @@ To follow the progress of KAN in RL you can check the repo [kanrl](https://githu
 
 envs = ["CartPole-v1", "MountainCar-v0", "Acrobot-v1", "Pendulum-v1", "MountainCarContinuous-v0", "LunarLander-v2", "Swimmer-v4", "Hopper-v4"]
 
+
+class Logger:
+    def __init__(self, filename):
+        self.terminal = sys.stdout
+        self.log = open(filename, "w")
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
+    def isatty(self):
+        return False
+
+sys.stdout = Logger("output.log")
+sys.stderr = Logger("output.log")
+
+def read_logs():
+    sys.stdout.flush()
+    with open("output.log", "r") as f:
+        return f.read()
 
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
@@ -129,9 +154,12 @@ if __name__ == "__main__":
                 kan_architecture = gr.Image(interactive=False, label="KAN architecture")
                 sym_video = gr.Video(label="Symbolic policy video", interactive=False, autoplay=True)
         sym_formula = gr.Markdown(elem_id="formula")
+        with gr.Accordion("See logs"):
+            logs = gr.TextBox()
         choice.input(load_video_and_dataset, inputs=[choice], outputs=[expert_video, button])
         button.click(extract_interpretable_policy, inputs=[choice, kan_widths], outputs=[kan_architecture]).then(
             symbolic_policy, inputs=[], outputs=[sym_video, sym_formula]
         )
+        app.load(read_logs, None, logs, every=1)
 
     app.launch()
