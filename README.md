@@ -27,6 +27,17 @@ The following plot displays the interpretable policy learned by KAQN during a su
 - **Performance Comparison**: It's noteworthy that KAQN operates notably slower than DQN, with over a 10x difference in speed, despite having fewer parameters. This applies to both inference and training phases.
 - **Interpretable Policy**: The learned policy with KANs is more interpretable than MLP, I'm currently working on extraction on interpretable policy...
 
+
+### KAN for RL interpretability
+
+In a web application, we showcase a method to make a trained Reinforcement Learning (RL) policy interpretable using the Kolmogorov-Arnold Network (KAN). The process involves transferring the knowledge from a pre-trained RL policy to a KAN. We achieve this by training the KAN to map actions from observations obtained from trajectories of the pre-trained policy. We also provide videos of agents using both pre-trained RL and KAN policy. To launch the app, run : 
+
+```bash
+python interpretable/app.py
+```
+
+The app is also directly hosted on hugging face : https://huggingface.co/spaces/riiswa/RL-Interpretable-Policy-via-Kolmogorov-Arnold-Network
+
 ## Contributing
 
 I welcome the community to enhance this project. There are plenty of opportunities to contribute, like hyperparameters search, benchmark with classic DQN, implementation of others algorithm (REINFORCE, A2C, etc...) and additional environment support.
