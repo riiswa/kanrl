@@ -36,7 +36,7 @@ For more information about KAN you can read the [paper](https://arxiv.org/abs/24
 To follow the progress of KAN in RL you can check the repo [kanrl](https://github.com/riiswa/kanrl).
 """
 
-envs = ["CartPole-v1", "MountainCar-v0", "Acrobot-v1", "Pendulum-v1", "MountainCarContinuous-v0", "LunarLander-v2", "Swimmer-v4", "Hopper-v4"]
+envs = ["CartPole-v1", "MountainCar-v0", "Acrobot-v1", "Pendulum-v1", "MountainCarContinuous-v0", "LunarLander-v2", "Swimmer-v3", "Hopper-v3"]
 
 
 if __name__ == "__main__":
@@ -45,6 +45,8 @@ if __name__ == "__main__":
     def load_video_and_dataset(_env_name):
         env_name = _env_name
 
+        if env_name.startswith("Swimmer") or env_name.startswith("Hopper-v3"):
+            gr.Warning("We're currently in the process of adding support for Mujoco environments, so the application may encounter crashes during this phase. We encourage contributors to join us in the repository https://github.com/riiswa/kanrl to assist in the development and support of other environments. Your contributions are invaluable in ensuring a robust and comprehensive framework.")
         dataset_path, video_path = generate_dataset_from_expert("ppo", _env_name, 15, 3)
         return video_path, gr.Button("Compute the symbolic policy!", interactive=True), {
             "dataset_path": dataset_path,

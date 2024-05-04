@@ -112,10 +112,6 @@ def rollouts(env, policy, num_episodes=1):
 def generate_dataset_from_expert(algo, env_name, num_train_episodes=5, num_test_episodes=2, force=False):
     if env_name.startswith("Swimmer") or env_name.startswith("Hopper"):
         install_mujoco()
-    if env_name == "Swimmer-v4":
-        env_name = "Swimmer-v3"
-    elif env_name == "Hopper-v4":
-        env_name = "Hopper-v3"
     dataset_path = os.path.join("datasets", f"{algo}-{env_name}.pt")
     video_path = os.path.join("videos", f"{algo}-{env_name}.mp4")
     if os.path.exists(dataset_path) and os.path.exists(video_path) and not force:
