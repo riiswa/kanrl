@@ -8,5 +8,10 @@ hydra-joblib-launcher~=1.2.0
 scikit-learn~=1.4.2
 matplotlib~=3.8.4
 tensorboard~=2.16.2
-gymnasium[box2d]
-
+gymnasium[box2d, mujoco]
+mujoco-py
+huggingface_hub
+huggingface_sb3
+stable-baselines3
+moviepy
+rl-zoo3
