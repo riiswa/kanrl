@@ -1,0 +1,16 @@
+gymnasium[box2d,mujoco]~=0.29.1
+torch~=2.2.2
+numpy~=1.26.4
+pykan~=0.0.2
+tqdm~=4.66.2
+scikit-learn~=1.4.2
+matplotlib~=3.8.4
+moviepy~=1.0.3
+huggingface_hub
+gradio
+huggingface_sb3
+stable_baselines3
+rl_zoo3
+gym
+shimmy>=0.2.1
+free-mujoco-py

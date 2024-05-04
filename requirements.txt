@@ -8,4 +8,5 @@ hydra-joblib-launcher~=1.2.0
 scikit-learn~=1.4.2
 matplotlib~=3.8.4
 tensorboard~=2.16.2
+gymnasium[box2d]
 

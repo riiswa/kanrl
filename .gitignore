@@ -1,0 +1,11 @@
+venv/
+.DS_Store
+.idea/
+__pycache__/
+multirun/
+outputs/
+results/
+runs/
+figures/
+datasets/
+videos/
