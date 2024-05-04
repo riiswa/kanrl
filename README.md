@@ -44,6 +44,9 @@ python app.py
 
 There is also a live-demo on Hugging Face : https://huggingface.co/spaces/riiswa/RL-Interpretable-Policy-via-Kolmogorov-Arnold-Network
 
+
+<img width="1163" alt="mlp_kan_compare" src="https://raw.githubusercontent.com/riiswa/kanrl/main/interpretable/demo.gif">
+
 ## Contributing
 
 I welcome the community to enhance this project. There are plenty of opportunities to contribute, like hyperparameters search, benchmark with classic DQN, implementation of others algorithm (REINFORCE, A2C, etc...) and additional environment support.
