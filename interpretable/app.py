@@ -56,13 +56,16 @@ class Logger:
     def isatty(self):
         return False
 
+
 sys.stdout = Logger("output.log")
 sys.stderr = Logger("output.log")
+
 
 def read_logs():
     sys.stdout.flush()
     with open("output.log", "r") as f:
         return f.read()
+
 
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
@@ -74,6 +77,7 @@ if __name__ == "__main__":
         global dataset_path
         global env_name
         env_name = _env_name
+
         dataset_path, video_path = generate_dataset_from_expert("ppo", _env_name, 15, 3)
         return video_path, gr.Button("Compute the symbolic policy!", interactive=True)
 
@@ -103,7 +107,6 @@ if __name__ == "__main__":
 
         ipe.policy.prune()
         ipe.policy.plot(mask=True, scale=5)
-        plt.savefig("kan-policy.png")
 
         fig = plt.gcf()
         fig.canvas.draw()
@@ -155,7 +158,7 @@ if __name__ == "__main__":
                 sym_video = gr.Video(label="Symbolic policy video", interactive=False, autoplay=True)
         sym_formula = gr.Markdown(elem_id="formula")
         with gr.Accordion("See logs"):
-            logs = gr.TextBox()
+            logs = gr.Textbox(label="Logs", interactive=False)
         choice.input(load_video_and_dataset, inputs=[choice], outputs=[expert_video, button])
         button.click(extract_interpretable_policy, inputs=[choice, kan_widths], outputs=[kan_architecture]).then(
             symbolic_policy, inputs=[], outputs=[sym_video, sym_formula]

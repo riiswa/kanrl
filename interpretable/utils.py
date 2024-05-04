@@ -13,6 +13,43 @@ from rl_zoo3 import ALGOS
 from gymnasium.wrappers import RecordVideo
 from stable_baselines3.common.running_mean_std import RunningMeanStd
 
+import os
+import tarfile
+import urllib.request
+
+
+def install_mujoco():
+    mujoco_url = "https://mujoco.org/download/mujoco210-linux-x86_64.tar.gz"
+    mujoco_file = "mujoco210-linux-x86_64.tar.gz"
+    mujoco_dir = "mujoco210"
+
+    # Check if the directory already exists
+    if not os.path.exists("mujoco210"):
+        # Download Mujoco if not exists
+        print("Downloading Mujoco...")
+        urllib.request.urlretrieve(mujoco_url, mujoco_file)
+
+        # Extract Mujoco
+        print("Extracting Mujoco...")
+        with tarfile.open(mujoco_file, "r:gz") as tar:
+            tar.extractall()
+
+        # Clean up the downloaded tar file
+        os.remove(mujoco_file)
+
+        print("Mujoco installed successfully!")
+    else:
+        print("Mujoco already installed.")
+
+    # Set environment variable MUJOCO_PY_MUJOCO_PATH
+    os.environ["MUJOCO_PY_MUJOCO_PATH"] = os.path.abspath(mujoco_dir)
+
+    ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+    mujoco_bin_path = os.path.join(os.path.abspath(mujoco_dir), "bin")
+    if mujoco_bin_path not in ld_library_path:
+        os.environ["LD_LIBRARY_PATH"] = ld_library_path + ":" + mujoco_bin_path
+
+
 
 class NormalizeObservation(gym.Wrapper):
     def __init__(self, env: gym.Env, clip_obs: float, obs_rms: RunningMeanStd, epsilon: float):
@@ -73,6 +110,8 @@ def rollouts(env, policy, num_episodes=1):
 
 
 def generate_dataset_from_expert(algo, env_name, num_train_episodes=5, num_test_episodes=2, force=False):
+    if env_name.startswith("Swimmer") or env_name.startswith("Hopper"):
+        install_mujoco()
     if env_name == "Swimmer-v4":
         env_name = "Swimmer-v3"
     elif env_name == "Hopper-v4":
