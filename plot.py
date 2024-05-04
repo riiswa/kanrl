@@ -4,15 +4,21 @@ import matplotlib.pyplot as plt
 import glob
 
 
-def plot_results(algo1, algo2):
+def plot_results(rl_algo, algo1, algo2):
     files_algo1 = glob.glob(f"results/{algo1}_*.csv")
     files_algo2 = glob.glob(f"results/{algo2}_*.csv")
 
     df_algo1 = pd.concat((pd.read_csv(file) for file in files_algo1))
     df_algo2 = pd.concat((pd.read_csv(file) for file in files_algo2))
 
+    # TODO fix
+    df_algo1 = df_algo1.drop(['epoch'], axis=1)
+    df_algo1 = df_algo1.astype(int)
+    df_algo2 = df_algo2.astype(int)
+
     median_algo1 = df_algo1.groupby('episode')['length'].median()
     median_algo2 = df_algo2.groupby('episode')['length'].median()
+    
     quantile_25_algo1 = df_algo1.groupby('episode')['length'].quantile(0.25)
     quantile_75_algo1 = df_algo1.groupby('episode')['length'].quantile(0.75)
     quantile_25_algo2 = df_algo2.groupby('episode')['length'].quantile(0.25)
@@ -35,7 +41,7 @@ def plot_results(algo1, algo2):
 
     plt.xlabel('Episode')
     plt.ylabel('Episode Length')
-    plt.title(f'DDQN comparison with {algo1} and {algo2}')
+    plt.title(f'{rl_algo} comparison with {algo1} and {algo2}')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -44,8 +50,8 @@ def plot_results(algo1, algo2):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python script.py <algo1> <algo2>")
+    if len(sys.argv) != 4:
+        print("Usage: python script.py <rl_algo> <algo1> <algo2>")
         sys.exit(1)
 
     plot_results(*sys.argv[1:])
