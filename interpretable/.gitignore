@@ -1,3 +1,6 @@
 datasets
 videos
 figures
+*.log
+*.png
+mujoco210
