@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 import torch
 
 import gradio as gr
-import sys
 
 intro = """
 # Making RL Policy Interpretable with Kolmogorov-Arnold Network 🧠 ➙ 🔢
@@ -40,46 +39,18 @@ To follow the progress of KAN in RL you can check the repo [kanrl](https://githu
 envs = ["CartPole-v1", "MountainCar-v0", "Acrobot-v1", "Pendulum-v1", "MountainCarContinuous-v0", "LunarLander-v2", "Swimmer-v4", "Hopper-v4"]
 
 
-class Logger:
-    def __init__(self, filename):
-        self.terminal = sys.stdout
-        self.log = open(filename, "w")
-
-    def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
-
-    def flush(self):
-        self.terminal.flush()
-        self.log.flush()
-
-    def isatty(self):
-        return False
-
-
-sys.stdout = Logger("output.log")
-sys.stderr = Logger("output.log")
-
-
-def read_logs():
-    sys.stdout.flush()
-    with open("output.log", "r") as f:
-        return f.read()
-
-
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float32)
-    dataset_path = None
-    ipe = None
-    env_name = None
 
     def load_video_and_dataset(_env_name):
-        global dataset_path
-        global env_name
         env_name = _env_name
 
         dataset_path, video_path = generate_dataset_from_expert("ppo", _env_name, 15, 3)
-        return video_path, gr.Button("Compute the symbolic policy!", interactive=True)
+        return video_path, gr.Button("Compute the symbolic policy!", interactive=True), {
+            "dataset_path": dataset_path,
+            "ipe": None,
+            "env_name": env_name
+        }
 
 
     def parse_integer_list(input_str):
@@ -94,45 +65,44 @@ if __name__ == "__main__":
         except ValueError:
             return False
 
-    def extract_interpretable_policy(env_name, kan_widths):
-        global ipe
-
+    def extract_interpretable_policy(kan_widths, epochs, state):
         widths = parse_integer_list(kan_widths)
         if kan_widths is False:
             gr.Warning(f"Please enter widths {kan_widths} in the right format... The current run is executed with no hidden layer.")
             widths = None
 
-        ipe = InterpretablePolicyExtractor(env_name, widths)
-        ipe.train_from_dataset(dataset_path, steps=50)
+        state["ipe"] = InterpretablePolicyExtractor(state["env_name"], widths)
+        state["ipe"].train_from_dataset(state["dataset_path"], steps=epochs)
 
-        ipe.policy.prune()
-        ipe.policy.plot(mask=True, scale=5)
+        state["ipe"].policy.prune()
+        state["ipe"].policy.plot(mask=True, scale=5)
 
         fig = plt.gcf()
         fig.canvas.draw()
-        return np.array(fig.canvas.renderer.buffer_rgba())
+        kan_architecture = np.array(fig.canvas.renderer.buffer_rgba())
+        plt.close()
 
-    def symbolic_policy():
-        global ipe
-        global env_name
+        return kan_architecture, state, fig
+
+    def symbolic_policy(state):
         lib = ['x', 'x^2', 'x^3', 'x^4', 'exp', 'log', 'sqrt', 'tanh', 'sin', 'abs']
-        ipe.policy.auto_symbolic(lib=lib)
-        env = gym.make(env_name, render_mode="rgb_array")
-        env = RecordVideo(env, video_folder="videos", episode_trigger=lambda x: True, name_prefix=f"kan-{env_name}")
+        state["ipe"].policy.auto_symbolic(lib=lib)
+        env = gym.make(state["env_name"], render_mode="rgb_array")
+        env = RecordVideo(env, video_folder="videos", episode_trigger=lambda x: True, name_prefix=f"""kan-{state["env_name"]}""")
 
-        rollouts(env, ipe.forward, 2)
+        rollouts(env, state["ipe"].forward, 2)
 
-        video_path = os.path.join("videos", f"kan-{env_name}.mp4")
-        video_files = glob.glob(os.path.join("videos", f"kan-{env_name}-episode*.mp4"))
+        video_path = os.path.join("videos", f"""kan-{state["env_name"]}.mp4""")
+        video_files = glob.glob(os.path.join("videos", f"""kan-{state["env_name"]}-episode*.mp4"""))
         clips = [VideoFileClip(file) for file in video_files]
         final_clip = concatenate_videoclips(clips)
         final_clip.write_videofile(video_path, codec="libx264", fps=24)
 
         symbolic_formula = f"### The symbolic formula of the policy is:"
-        formulas = ipe.policy.symbolic_formula()[0]
+        formulas = state["ipe"].policy.symbolic_formula()[0]
         for i, formula in enumerate(formulas):
             symbolic_formula += "\n$$ a_" + str(i) + "=" + latex(formula) + "$$"
-        if ipe._action_is_discrete:
+        if state["ipe"]._action_is_discrete:
             symbolic_formula += "\n" + r"$$ a = \underset{i}{\mathrm{argmax}} \ a_i.$$"
 
         return video_path, symbolic_formula
@@ -143,6 +113,11 @@ if __name__ == "__main__":
     """
 
     with gr.Blocks(theme='gradio/monochrome', css=css) as app:
+        state = gr.State({
+            "dataset_path": None,
+            "ipe": None,
+            "env_name": None
+        })
         gr.Markdown(intro)
 
         with gr.Row():
@@ -151,18 +126,16 @@ if __name__ == "__main__":
                 choice = gr.Dropdown(envs, label="Environment name")
                 expert_video = gr.Video(label="Expert policy video", interactive=False, autoplay=True)
                 kan_widths = gr.Textbox(value="2", label="Widths of the hidden layers of the KAN, separated by commas (e.g. `3,3`). Leave empty if there are no hidden layers.")
+                epochs = gr.Number(value=20, label="KAN training Steps.", minimum=1, maximum=100)
                 button = gr.Button("Compute the symbolic policy!", interactive=False)
             with gr.Column():
                 gr.Markdown("### Symbolic policy extraction")
                 kan_architecture = gr.Image(interactive=False, label="KAN architecture")
                 sym_video = gr.Video(label="Symbolic policy video", interactive=False, autoplay=True)
         sym_formula = gr.Markdown(elem_id="formula")
-        with gr.Accordion("See logs"):
-            logs = gr.Textbox(label="Logs", interactive=False)
-        choice.input(load_video_and_dataset, inputs=[choice], outputs=[expert_video, button])
-        button.click(extract_interpretable_policy, inputs=[choice, kan_widths], outputs=[kan_architecture]).then(
-            symbolic_policy, inputs=[], outputs=[sym_video, sym_formula]
+        choice.input(load_video_and_dataset, inputs=[choice], outputs=[expert_video, button, state])
+        button.click(extract_interpretable_policy, inputs=[kan_widths, epochs, state], outputs=[kan_architecture, state]).then(
+            symbolic_policy, inputs=[state], outputs=[sym_video, sym_formula]
         )
-        app.load(read_logs, None, logs, every=1)
 
     app.launch()

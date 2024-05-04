@@ -13,4 +13,4 @@ stable_baselines3
 rl_zoo3
 gym
 shimmy>=0.2.1
-mujoco-py
+free-mujoco-py
