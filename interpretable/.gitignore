@@ -4,3 +4,5 @@ figures
 *.log
 *.png
 mujoco210
+.DS_Store
+__pycache__/
