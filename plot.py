@@ -4,11 +4,7 @@ import matplotlib.pyplot as plt
 import glob
 
 
-<<<<<<< HEAD
-def plot_results(rl_algo, algo1, algo2):
-=======
 def plot_results(rl_algo, algo1, algo2, algo3):
->>>>>>> 75b333a (Add initial REINFORCE-kan code)
     files_algo1 = glob.glob(f"results/{algo1}_*.csv")
     files_algo2 = glob.glob(f"results/{algo2}_*.csv")
     files_algo3 = glob.glob(f"results/{algo3}_*.csv")
@@ -30,10 +26,7 @@ def plot_results(rl_algo, algo1, algo2, algo3):
 
     median_algo1 = df_algo1.groupby('episode')['length'].median()
     median_algo2 = df_algo2.groupby('episode')['length'].median()
-<<<<<<< HEAD
-=======
     median_algo3 = df_algo3.groupby('episode')['length'].median()
->>>>>>> 75b333a (Add initial REINFORCE-kan code)
     
     quantile_25_algo1 = df_algo1.groupby('episode')['length'].quantile(0.25)
     quantile_75_algo1 = df_algo1.groupby('episode')['length'].quantile(0.75)
@@ -65,11 +58,7 @@ def plot_results(rl_algo, algo1, algo2, algo3):
 
     plt.xlabel('Episode')
     plt.ylabel('Episode Length')
-<<<<<<< HEAD
-    plt.title(f'{rl_algo} comparison with {algo1} and {algo2}')
-=======
     plt.title(f'{rl_algo} comparison with {algo1} and {algo2} and {algo3}')
->>>>>>> 75b333a (Add initial REINFORCE-kan code)
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -78,13 +67,8 @@ def plot_results(rl_algo, algo1, algo2, algo3):
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
-    if len(sys.argv) != 4:
-        print("Usage: python script.py <rl_algo> <algo1> <algo2>")
-=======
     if len(sys.argv) != 5:
         print("Usage: python script.py <rl_algo> <algo1> <algo2> <algo3>")
->>>>>>> 75b333a (Add initial REINFORCE-kan code)
         sys.exit(1)
 
     plot_results(*sys.argv[1:])

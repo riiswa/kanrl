@@ -1,8 +1,8 @@
 ---
 title: RL Interpretable Policy Via Kolmogorov Arnold Network
-emoji: 👀
-colorFrom: green
-colorTo: gray
+emoji: 🧠➡️🔢
+colorFrom: red
+colorTo: purple
 sdk: gradio
 sdk_version: 4.29.0
 app_file: app.py

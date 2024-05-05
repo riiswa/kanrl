@@ -4,27 +4,14 @@ env_id: CartPole-v1
 batch_size: 256
 n_episodes: 500
 warm_up_episodes: 50
-<<<<<<< HEAD
-gamma: 0.99
-train_steps: 5
-target_update_freq: 10
-pi_lr: 3e-4
-vf_lr: 1e-3
-replay_buffer_capacity: 10000
-=======
 episode_discount: 0.05
 gamma: 0.99
 train_steps: 5
 target_update_freq: 10
 learning_rate: 1e-2
->>>>>>> 75b333a (Add initial REINFORCE-kan code)
 width: 8
 grid: 5
 method: "KAN"
 seed: 0
-<<<<<<< HEAD
 log_interval: 10
-=======
-log_interval: 10
-rtg: True
->>>>>>> 75b333a (Add initial REINFORCE-kan code)
+rtg: False
