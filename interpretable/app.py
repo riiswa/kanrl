@@ -52,7 +52,7 @@ if __name__ == "__main__":
         if env_name == "Swimmer-v3" or env_name == "Walker2d-v3":
             agent = "trpo"
 
-        dataset_path, video_path = generate_dataset_from_expert(agent, _env_name, 25, 3)
+        dataset_path, video_path = generate_dataset_from_expert(agent, _env_name, 50, 3)
         return video_path, gr.Button("Compute the symbolic policy!", interactive=True), {
             "dataset_path": dataset_path,
             "ipe": None,
