@@ -36,9 +36,11 @@ For more information about KAN you can read the [paper](https://arxiv.org/abs/24
 To follow the progress of KAN in RL you can check the repo [kanrl](https://github.com/riiswa/kanrl).
 
 [![riiswa/kanrl - GitHub](https://gh-card.dev/repos/riiswa/kanrl.svg)](https://github.com/riiswa/kanrl)
+
+*Please be patient, as the process may take a few minutes to run, especially in environments with large state/action spaces or with a complex KAN architecture. Some Mujoco environments are available if you run this app locally. For optimal performance, default parameters may not suffice. Feel free to experiment with different settings to achieve desired results.*
 """
 
-envs = ["CartPole-v1", "MountainCar-v0", "Acrobot-v1", "Pendulum-v1", "MountainCarContinuous-v0", "LunarLander-v2", "Swimmer-v3", "Hopper-v3"]
+envs = ["CartPole-v1", "MountainCar-v0", "Acrobot-v1", "Pendulum-v1", "MountainCarContinuous-v0", "LunarLander-v2", "BipedalWalker-v3", "Swimmer-v3", "Hopper-v3", "HalfCheetah-v3", "Walker2d-v3"]
 
 
 if __name__ == "__main__":
@@ -46,10 +48,11 @@ if __name__ == "__main__":
 
     def load_video_and_dataset(_env_name):
         env_name = _env_name
+        agent = "ppo"
+        if env_name == "Swimmer-v3" or env_name == "Walker2d-v3":
+            agent = "trpo"
 
-        if env_name.startswith("Swimmer") or env_name.startswith("Hopper-v3"):
-            gr.Warning("We're currently in the process of adding support for Mujoco environments, so the application may encounter crashes during this phase. We encourage contributors to join us in the repository https://github.com/riiswa/kanrl to assist in the development and support of other environments. Your contributions are invaluable in ensuring a robust and comprehensive framework.")
-        dataset_path, video_path = generate_dataset_from_expert("ppo", _env_name, 15, 3)
+        dataset_path, video_path = generate_dataset_from_expert(agent, _env_name, 15, 3)
         return video_path, gr.Button("Compute the symbolic policy!", interactive=True), {
             "dataset_path": dataset_path,
             "ipe": None,
@@ -126,7 +129,7 @@ if __name__ == "__main__":
 
         with gr.Row():
             with gr.Column():
-                gr.Markdown("### Pretrained policy loading (PPO from [rl-baselines3-zoo](https://github.com/DLR-RM/rl-baselines3-zoo))")
+                gr.Markdown("### Pretrained policy loading (PPO or TRPO from [rl-baselines3-zoo](https://github.com/DLR-RM/rl-baselines3-zoo))")
                 choice = gr.Dropdown(envs, label="Environment name")
                 expert_video = gr.Video(label="Expert policy video", interactive=False, autoplay=True)
                 kan_widths = gr.Textbox(value="2", label="Widths of the hidden layers of the KAN, separated by commas (e.g. `3,3`). Leave empty if there are no hidden layers.")

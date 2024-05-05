@@ -33,10 +33,12 @@ class InterpretablePolicyExtractor:
             dataset["train_label"] = dataset["train_label"][:, None]
         if dataset["train_label"].ndim == 1 and not self._action_is_discrete:
             dataset["test_label"] = dataset["test_label"][:, None]
+        dataset["train_input"] = dataset["train_input"].float()
+        dataset["test_input"] = dataset["test_input"].float()
         return self.policy.train(dataset, opt="LBFGS", steps=steps, loss_fn=self.loss_fn)
 
     def forward(self, observation):
-        observation = torch.from_numpy(observation)
+        observation = torch.from_numpy(observation).float()
         action = self.policy(observation.unsqueeze(0))
         if self._action_is_discrete:
             return action.argmax(axis=-1).squeeze().item()
