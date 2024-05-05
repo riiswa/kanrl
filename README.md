@@ -44,8 +44,7 @@ python app.py
 
 There is also a live-demo on Hugging Face : https://huggingface.co/spaces/riiswa/RL-Interpretable-Policy-via-Kolmogorov-Arnold-Network
 
-
-<img width="1163" alt="mlp_kan_compare" src="https://raw.githubusercontent.com/riiswa/kanrl/main/interpretable/demo.gif">
+<img alt="demo" src="https://raw.githubusercontent.com/riiswa/kanrl/main/interpretable/demo.gif">
 
 ## Contributing
 
