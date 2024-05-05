@@ -1,5 +1,6 @@
 defaults:
   - override hydra/launcher: joblib
+algorithm: kaqn
 env_id: CartPole-v1
 batch_size: 256
 n_episodes: 500

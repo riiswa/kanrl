@@ -111,7 +111,6 @@ def set_all_seeds(seed):
     torch.use_deterministic_algorithms(True)
 
 
-@hydra.main(config_path=".", config_name="config", version_base=None)
 def main(config: DictConfig):
     set_all_seeds(config.seed)
     env = gym.make(config.env_id)
@@ -222,6 +221,3 @@ def main(config: DictConfig):
             if episode % config.target_update_freq == 0:
                 target_network.load_state_dict(q_network.state_dict())
 
-
-if __name__ == "__main__":
-    main()
