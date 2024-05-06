@@ -1,0 +1,17 @@
+defaults:
+  - override hydra/launcher: joblib
+env_id: CartPole-v1
+batch_size: 256
+n_episodes: 500
+warm_up_episodes: 50
+episode_discount: 0.05
+gamma: 0.99
+train_steps: 5
+target_update_freq: 10
+learning_rate: 1e-2
+width: 8
+grid: 5
+method: "KAN"
+seed: 0
+log_interval: 10
+rtg: False
