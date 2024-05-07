@@ -111,7 +111,7 @@ def set_all_seeds(seed):
     torch.use_deterministic_algorithms(True)
 
 
-@hydra.main(config_path=".", config_name="config", version_base=None)
+@hydra.main(config_path="conf", config_name="ddqn_config", version_base=None)
 def main(config: DictConfig):
     set_all_seeds(config.seed)
     env = gym.make(config.env_id)
@@ -152,7 +152,7 @@ def main(config: DictConfig):
 
     target_network.load_state_dict(q_network.state_dict())
 
-    run_name = f"{config.method}_{config.env_id}_{config.seed}_{int(time.time())}"
+    run_name = f"DDQN_{config.method}_{config.env_id}_{config.seed}_{int(time.time())}"
 
     writer = SummaryWriter(f"runs/{run_name}")
 
