@@ -16,8 +16,10 @@ from gymnasium import spaces
 from omegaconf import DictConfig
 from kan import KAN
 
+from utils.kan_utils import reg
+
 # Train a policy on 'training_steps' steps in an environment, with updates every 'batch_size' steps 
-def train_reinforce(
+def train_policy_gradient(
         method="mlp", 
         env_name='CartPole-v0', 
         lr=1e-2, 
@@ -25,6 +27,13 @@ def train_reinforce(
         grid=5,
         training_steps=300_000, 
         batch_size=5000,
+        lamb=0.01,
+        lamb_l1=1.0,
+        lamb_entropy=2.0,
+        lamb_coef=0.0,
+        lamb_coefdiff=0.0,
+        small_mag_threshold=1e-16,
+        small_reg_factor=1.0,
         seed=0):
     
     print(f"Training simple {method} policy on {env_name} for {training_steps} timesteps")
@@ -120,7 +129,21 @@ def train_reinforce(
                                   act=torch.as_tensor(batch_acts, dtype=torch.int32),
                                   weights=torch.as_tensor(batch_weights, dtype=torch.float32)
                                   )
-        batch_loss.backward()
+        
+        # TODO : not really clean, see how to refactor this (add reg term to the loss if KAN)
+        if method == "KAN":
+            reg_ = reg(logits_net,
+               lamb_l1=lamb_l1,
+               lamb_entropy=lamb_entropy,
+               lamb_coef=lamb_coef,
+               lamb_coefdiff=lamb_coefdiff,
+               small_mag_threshold=small_mag_threshold,
+               small_reg_factor=small_reg_factor)
+            loss = batch_loss + lamb * reg_
+        else:
+            loss = batch_loss
+
+        loss.backward()
         optimizer.step()
         avg_return = np.mean(batch_rets)
         return avg_return, batch_lens
@@ -140,6 +163,7 @@ def train_reinforce(
             f.write(f"{n_steps},{avg_return}\n")
         if n_steps % 10 * batch_size == 0:
             print(f"training_steps: {n_steps} - return: {avg_return:.3f}")
+            # TODO : should also maybe add logits_net.update_grid_from_samples
 
     print(f"\nFinal results - training_steps: {n_steps} - return: {avg_return:.3f}")
 
@@ -158,7 +182,7 @@ def main(config: DictConfig):
     set_all_seeds(config.seed)
     
     start = time.time()
-    train_reinforce(method=config.method, 
+    train_policy_gradient(method=config.method, 
                     env_name=config.env_name, 
                     training_steps=config.training_steps, 
                     batch_size=config.batch_size,
