@@ -3,8 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 
-csv_columns = {"DDQN": ['episode', 'length'],
-            "Simple_PG": ['timestep', 'avg_return']}
+LINES_ALPHA = 0.7
+SHADED_AREA_ALPHA = 0.3
+
+# TODO : Improve this mechanism
+csv_columns = {
+    "DDQN": ['episode', 'length'],
+    "Simple_PG": ['timestep', 'avg_return'],
+    }
 
 def plot_results(algo, method1, method2):
     x_axis, value = csv_columns[algo]
@@ -26,24 +32,25 @@ def plot_results(algo, method1, method2):
 
     plt.figure(figsize=(6, 4))
 
-    plt.plot(median_method1.index, median_method1, label=f"{method1}", color='blue')
-    plt.fill_between(median_method1.index, quantile_25_method1, quantile_75_method1, alpha=0.3, color='blue')
+    plt.plot(median_method1.index, median_method1, label=f"{method1}", alpha=LINES_ALPHA, color='blue')
+    plt.fill_between(median_method1.index, quantile_25_method1, quantile_75_method1, alpha=SHADED_AREA_ALPHA, color='blue')
 
-    plt.plot(median_method2.index, median_method2, label=f"{method2}", color='red')
-    plt.fill_between(median_method2.index, quantile_25_method2, quantile_75_method2, alpha=0.3, color='red')
+    plt.plot(median_method2.index, median_method2, label=f"{method2}", alpha=LINES_ALPHA, color='red')
+    plt.fill_between(median_method2.index, quantile_25_method2, quantile_75_method2, alpha=SHADED_AREA_ALPHA, color='red')
 
-    plt.plot(best_method1.index, best_method1, label=f"{method1} (Best)", color='blue', marker='*', markersize=10, markevery=10, lw=2)
+    plt.plot(best_method1.index, best_method1, label=f"{method1} (Best)", alpha=LINES_ALPHA, color='blue', marker='*', markersize=10, markevery=10, lw=2)
 
-    plt.plot(best_method2.index, best_method2, label=f"{method2} (Best)", color='red', marker='*', markersize=10, markevery=10, lw=2)
+    plt.plot(best_method2.index, best_method2, label=f"{method2} (Best)", alpha=LINES_ALPHA, color='red', marker='*', markersize=10, markevery=10, lw=2)
 
     plt.xlabel(x_axis)
     plt.ylabel('Episode Length')
-    plt.title(f'{algo} comparison with {method1} and {method2}')
+    # plt.title(f'{algo} comparison with {method1} and {method2}')
+    plt.title(f'Simple_PG comparison with {method1} (with regularization) and {method2}')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig(f"{algo}_results.png")
+    plt.savefig(f"plots/{algo}_results__.png")
     plt.show()
 
 
