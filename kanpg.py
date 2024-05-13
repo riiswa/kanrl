@@ -27,7 +27,7 @@ def train_policy_gradient(
         grid=5,
         training_steps=300_000, 
         batch_size=5000,
-        lamb=0.01,
+        lamb=0.0,
         lamb_l1=1.0,
         lamb_entropy=2.0,
         lamb_coef=0.0,
@@ -51,7 +51,6 @@ def train_policy_gradient(
     assert isinstance(env.action_space, spaces.Discrete), \
         "This example only works for envs with discrete action spaces."
     
-
     if method == "MLP":
         logits_net = nn.Sequential(
             nn.Linear(env.observation_space.shape[0], width),
@@ -82,6 +81,13 @@ def train_policy_gradient(
     def get_action(obs):
         action = get_policy(obs).sample().item()
         return action
+    
+    def reward_to_go(rewards):
+        n = len(rewards)
+        rtg = np.zeros_like(rewards)
+        for i in reversed(range(n)):
+            rtg[i] = rewards[i] + (rtg[i+1] if i+1 < n else 0)
+        return rtg
     
     def compute_loss(obs, act, weights):
         logits = get_batch_policy(obs)
@@ -115,7 +121,7 @@ def train_policy_gradient(
                 batch_lens.append(ep_len)
 
                 # the weight for each logprob(a|s) is R(tau)
-                batch_weights += [ep_ret] * ep_len
+                batch_weights += list(reward_to_go(ep_rews))
 
                 obs, _= env.reset()
                 done, truncated, ep_rews = False, False, []
