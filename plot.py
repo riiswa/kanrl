@@ -44,13 +44,12 @@ def plot_results(algo, method1, method2):
 
     plt.xlabel(x_axis)
     plt.ylabel('Episode Length')
-    # plt.title(f'{algo} comparison with {method1} and {method2}')
-    plt.title(f'Simple_PG comparison with {method1} (with regularization) and {method2}')
+    plt.title(f'{algo} comparison with {method1} and {method2}')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig(f"plots/{algo}_results__.png")
+    plt.savefig(f"plots/{algo}_results.png")
     plt.show()
 
 
