@@ -3,49 +3,59 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 
+LINES_ALPHA = 0.7
+SHADED_AREA_ALPHA = 0.3
 
-def plot_results(algo1, algo2):
-    files_algo1 = glob.glob(f"results/{algo1}_*.csv")
-    files_algo2 = glob.glob(f"results/{algo2}_*.csv")
+# TODO : Improve this mechanism
+csv_columns = {
+    "DDQN": ['episode', 'length'],
+    "Simple_PG": ['timestep', 'avg_return'],
+    }
 
-    df_algo1 = pd.concat((pd.read_csv(file) for file in files_algo1))
-    df_algo2 = pd.concat((pd.read_csv(file) for file in files_algo2))
+def plot_results(algo, method1, method2):
+    x_axis, value = csv_columns[algo]
+    files_method1 = glob.glob(f"results/{algo}_{method1}_*.csv")
+    files_method2 = glob.glob(f"results/{algo}_{method2}_*.csv")
 
-    median_algo1 = df_algo1.groupby('episode')['length'].median()
-    median_algo2 = df_algo2.groupby('episode')['length'].median()
-    quantile_25_algo1 = df_algo1.groupby('episode')['length'].quantile(0.25)
-    quantile_75_algo1 = df_algo1.groupby('episode')['length'].quantile(0.75)
-    quantile_25_algo2 = df_algo2.groupby('episode')['length'].quantile(0.25)
-    quantile_75_algo2 = df_algo2.groupby('episode')['length'].quantile(0.75)
+    df_method1 = pd.concat((pd.read_csv(file) for file in files_method1))
+    df_method2 = pd.concat((pd.read_csv(file) for file in files_method2))
 
-    best_algo1 = df_algo1.groupby('episode')['length'].max()
-    best_algo2 = df_algo2.groupby('episode')['length'].max()
+    median_method1 = df_method1.groupby(x_axis)[value].median()
+    median_method2 = df_method2.groupby(x_axis)[value].median()
+    quantile_25_method1 = df_method1.groupby(x_axis)[value].quantile(0.25)
+    quantile_75_method1 = df_method1.groupby(x_axis)[value].quantile(0.75)
+    quantile_25_method2 = df_method2.groupby(x_axis)[value].quantile(0.25)
+    quantile_75_method2 = df_method2.groupby(x_axis)[value].quantile(0.75)
+
+    best_method1 = df_method1.groupby(x_axis)[value].max()
+    best_method2 = df_method2.groupby(x_axis)[value].max()
 
     plt.figure(figsize=(6, 4))
 
-    plt.plot(median_algo1.index, median_algo1, label=f"{algo1}", color='blue')
-    plt.fill_between(median_algo1.index, quantile_25_algo1, quantile_75_algo1, alpha=0.3, color='blue')
+    plt.plot(median_method1.index, median_method1, label=f"{method1}", alpha=LINES_ALPHA, color='blue')
+    plt.fill_between(median_method1.index, quantile_25_method1, quantile_75_method1, alpha=SHADED_AREA_ALPHA, color='blue')
 
-    plt.plot(median_algo2.index, median_algo2, label=f"{algo2}", color='red')
-    plt.fill_between(median_algo2.index, quantile_25_algo2, quantile_75_algo2, alpha=0.3, color='red')
+    plt.plot(median_method2.index, median_method2, label=f"{method2}", alpha=LINES_ALPHA, color='red')
+    plt.fill_between(median_method2.index, quantile_25_method2, quantile_75_method2, alpha=SHADED_AREA_ALPHA, color='red')
 
-    plt.plot(best_algo1.index, best_algo1, label=f"{algo1} (Best)", color='blue', marker='*', markersize=10, markevery=10, lw=2)
+    plt.plot(best_method1.index, best_method1, label=f"{method1} (Best)", alpha=LINES_ALPHA, color='blue', marker='*', markersize=10, markevery=10, lw=2)
 
-    plt.plot(best_algo2.index, best_algo2, label=f"{algo2} (Best)", color='red', marker='*', markersize=10, markevery=10, lw=2)
+    plt.plot(best_method2.index, best_method2, label=f"{method2} (Best)", alpha=LINES_ALPHA, color='red', marker='*', markersize=10, markevery=10, lw=2)
 
-    plt.xlabel('Episode')
+    plt.xlabel(x_axis)
     plt.ylabel('Episode Length')
-    plt.title(f'DDQN comparison with {algo1} and {algo2}')
+    plt.title(f'{algo} comparison with {method1} and {method2}')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
 
+    plt.savefig(f"plots/{algo}_results.png")
     plt.show()
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python script.py <algo1> <algo2>")
+    if len(sys.argv) != 4:
+        print("Usage: python script.py <algo> <method1> <method2>")
         sys.exit(1)
 
     plot_results(*sys.argv[1:])
