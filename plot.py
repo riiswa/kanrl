@@ -12,6 +12,7 @@ csv_columns = {
     "Simple_PG": ['timestep', 'avg_return'],
     }
 
+# TODO : Should also add env_name
 def plot_results(algo, method1, method2):
     x_axis, value = csv_columns[algo]
     files_method1 = glob.glob(f"results/{algo}_{method1}_*.csv")
@@ -39,7 +40,6 @@ def plot_results(algo, method1, method2):
     plt.fill_between(median_method2.index, quantile_25_method2, quantile_75_method2, alpha=SHADED_AREA_ALPHA, color='red')
 
     plt.plot(best_method1.index, best_method1, label=f"{method1} (Best)", alpha=LINES_ALPHA, color='blue', marker='*', markersize=10, markevery=10, lw=2)
-
     plt.plot(best_method2.index, best_method2, label=f"{method2} (Best)", alpha=LINES_ALPHA, color='red', marker='*', markersize=10, markevery=10, lw=2)
 
     plt.xlabel(x_axis)
