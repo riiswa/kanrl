@@ -43,15 +43,18 @@ def main(config: DictConfig):
     set_all_seeds(config.seed)
     env = gym.make(config.env_id)
 
-    print(f"{config.method}")
-
-    # TODO Do we want to be able to define different configs for both networks (e.g 1 KAN and 1 MLP) ?
-    # TODO : not rly clean to pass only the env and the config I think
-    q_network = initialize_network(env=env, **config)
-    target_network = initialize_network(env=env, **config)
+    # TODO : Might be a cleaner way to initialize the networks
+    q_network = initialize_network(
+        input_size=env.observation_space.shape[0],
+        output_size=env.action_space.n,
+        **config)
+    target_network = initialize_network(
+        input_size=env.observation_space.shape[0],
+        output_size=env.action_space.n,
+        **config)
 
     target_network.load_state_dict(q_network.state_dict())
-
+    
     run_name = f"DDQN_{config.method}_{config.env_id}_{config.seed}_{int(time.time())}"
     writer = SummaryWriter(f"runs/{run_name}")
 

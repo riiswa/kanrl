@@ -1,4 +1,3 @@
-# Implementation of simple policy gradient
 import torch
 import torch.nn as nn
 
@@ -14,12 +13,10 @@ SMALL_REG_FACTOR = 1.0
 
 
 # TODO : Used **kwargs to handle the fact MLPs and KANs use diff args, but env and **kwargs doesn't seem clean
-def initialize_network(env, **kwargs):
+def initialize_network(input_size, output_size, **kwargs):
     """Initialize a network with the specified config
     """
     method = kwargs["method"]
-    input_size = env.observation_space.shape[0]
-    output_size = env.action_space.n
     width = kwargs["width"]
 
     # TODO : Should maybe allow having deeper networks in this function
