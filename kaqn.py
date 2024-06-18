@@ -1,69 +1,25 @@
 import os
 import time
-import random
 
-import gymnasium as gym
+import hydra
 import torch
 import torch.nn as nn
-from hydra.core.hydra_config import HydraConfig
-from kan import KAN
+import gymnasium as gym
+
 from torch.utils.tensorboard import SummaryWriter
-import numpy as np
+from hydra.core.hydra_config import HydraConfig
 
 from buffer import ReplayBuffer
-import hydra
 from omegaconf import DictConfig
 from tqdm import tqdm
 
-from utils.kan_utils import reg
+from utils import set_all_seeds
+from networks import initialize_network, reg
 
-
-def kan_train(
+def compute_loss(
     net,
     target,
     data,
-    optimizer,
-    gamma=0.99,
-    lamb=0.01,
-    lamb_l1=1.0,
-    lamb_entropy=2.0,
-    lamb_coef=0.0,
-    lamb_coefdiff=0.0,
-    small_mag_threshold=1e-16,
-    small_reg_factor=1.0,
-):
-    observations, actions, next_observations, rewards, terminations = data
-
-    with torch.no_grad():
-        next_q_values = net(next_observations)
-        next_actions = next_q_values.argmax(dim=1)
-        next_q_values_target = target(next_observations)
-        target_max = next_q_values_target[range(len(next_q_values)), next_actions]
-        td_target = rewards.flatten() + gamma * target_max * (
-            1 - terminations.flatten()
-        )
-
-    old_val = net(observations).gather(1, actions).squeeze()
-    loss = nn.functional.mse_loss(td_target, old_val)
-    reg_ = reg(net,
-               lamb_l1=lamb_l1,
-               lamb_entropy=lamb_entropy,
-               lamb_coef=lamb_coef,
-               lamb_coefdiff=lamb_coefdiff,
-               small_mag_threshold=small_mag_threshold,
-               small_reg_factor=small_reg_factor)
-    loss = loss + lamb * reg_
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    return loss.item()
-
-
-def mlp_train(
-    net,
-    target,
-    data,
-    optimizer,
     gamma=0.99,
 ):
     observations, actions, next_observations, rewards, terminations = data
@@ -79,64 +35,27 @@ def mlp_train(
 
     old_val = net(observations).gather(1, actions).squeeze()
     loss = nn.functional.mse_loss(td_target, old_val)
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    return loss.item()
-
-
-def set_all_seeds(seed):
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.use_deterministic_algorithms(True)
+    return loss 
 
 
 @hydra.main(config_path="conf", config_name="ddqn_config", version_base=None)
 def main(config: DictConfig):
     set_all_seeds(config.seed)
     env = gym.make(config.env_id)
-    if config.method == "KAN":
-        q_network = KAN(
-            width=[env.observation_space.shape[0], config.width, env.action_space.n],
-            grid=config.grid,
-            k=3,
-            bias_trainable=False,
-            sp_trainable=False,
-            sb_trainable=False,
-        )
-        target_network = KAN(
-            width=[env.observation_space.shape[0], config.width, env.action_space.n],
-            grid=config.grid,
-            k=3,
-            bias_trainable=False,
-            sp_trainable=False,
-            sb_trainable=False,
-        )
-        train = kan_train
-    elif config.method == "MLP":
-        q_network = nn.Sequential(
-            nn.Linear(env.observation_space.shape[0], config.width),
-            nn.ReLU(),
-            nn.Linear(config.width, env.action_space.n),
-        )
-        target_network = nn.Sequential(
-            nn.Linear(env.observation_space.shape[0], config.width),
-            nn.ReLU(),
-            nn.Linear(config.width, env.action_space.n),
-        )
-        train = mlp_train
-    else:
-        raise Exception(
-            f"Method {config.method} don't exist, choose between MLP and KAN."
-        )
+
+    # TODO : Might be a cleaner way to initialize the networks
+    q_network = initialize_network(
+        input_size=env.observation_space.shape[0],
+        output_size=env.action_space.n,
+        **config)
+    target_network = initialize_network(
+        input_size=env.observation_space.shape[0],
+        output_size=env.action_space.n,
+        **config)
 
     target_network.load_state_dict(q_network.state_dict())
-
+    
     run_name = f"DDQN_{config.method}_{config.env_id}_{config.seed}_{int(time.time())}"
-
     writer = SummaryWriter(f"runs/{run_name}")
 
     os.makedirs("results", exist_ok=True)
@@ -164,12 +83,14 @@ def main(config: DictConfig):
                 action = env.action_space.sample()
             else:
                 action = (
-                    q_network(observation.unsqueeze(0).double())
+                    # Changed .double to .float()
+                    q_network(observation.unsqueeze(0).float())
                     .argmax(axis=-1)
                     .squeeze()
                     .item()
                 )
             next_observation, reward, terminated, truncated, info = env.step(action)
+            # TODO : Do we wanna keep this specific condition for CartPole env ? 
             if config.env_id == "CartPole-v1":
                 reward = -1 if terminated else 0
             next_observation = torch.from_numpy(next_observation)
@@ -179,28 +100,39 @@ def main(config: DictConfig):
             observation = next_observation
             finished = terminated or truncated
             episode_length += 1
+
+        # When an episode is finished:
         with open(f"results/{run_name}.csv", "a") as f:
             f.write(f"{episode},{episode_length}\n")
+
+        # TODO : Could maybe add all the code below in a train function ? 
         if len(buffer) >= config.batch_size:
             for _ in range(config.train_steps):
-                loss = train(
+                loss = compute_loss(
                     q_network,
                     target_network,
                     buffer.sample(config.batch_size),
-                    optimizer,
                     config.gamma,
                 )
+                
+                if config.method == "KAN":
+                    # TODO : should we enable specifying args for reg (lambs ...) ? Keep it like that ? Or just remove it ? 
+                    reg_ = reg(net=q_network)
+                    loss += config.lamb * reg_
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
             writer.add_scalar("episode_length", episode_length, episode)
             writer.add_scalar("loss", loss, episode)
+            # TODO : See how we should handle that specific update of KAN networks 
             if (
                 episode % 25 == 0
                 and config.method == "KAN"
                 and episode < int(config.n_episodes * (1 / 2))
             ):
                 q_network.update_grid_from_samples(buffer.observations[: len(buffer)])
-                target_network.update_grid_from_samples(
-                    buffer.observations[: len(buffer)]
-                )
+                target_network.update_grid_from_samples(buffer.observations[: len(buffer)])
 
             if episode % config.target_update_freq == 0:
                 target_network.load_state_dict(q_network.state_dict())
