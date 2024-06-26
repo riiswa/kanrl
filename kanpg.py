@@ -5,6 +5,7 @@ import time
 import hydra
 import numpy as np
 import torch
+import torch.nn as nn 
 import gymnasium as gym
 
 from torch.utils.tensorboard import SummaryWriter
@@ -19,29 +20,26 @@ from utils import set_all_seeds
 from networks import initialize_network, reg
 
 
-def get_policy(logits_net, obs):
-    logits = logits_net(obs.unsqueeze(0).float()).squeeze()
-    return Categorical(logits=logits)
+class Agent(nn.Module):
+    def __init__(self, env, config):
+        super().__init__()
+        self.logits_net = initialize_network(
+            input_size=env.observation_space.shape[0],
+            output_size=env.action_space.n,
+            **config
+        )
+        
+    def get_policy(self, obs):
+        logits = self.logits_net(obs.unsqueeze(0).float()).squeeze()
+        return Categorical(logits=logits)
 
-def get_batch_policy(logits_net, obs):
-    logits = logits_net(obs.float())
-    return Categorical(logits=logits)
+    def get_batch_policy(self, obs):
+        logits = self.logits_net(obs.float())
+        return Categorical(logits=logits)
 
-def get_action(logits_net, obs):
-    action = get_policy(logits_net, obs).sample().item()
-    return action
-
-def reward_to_go(rewards):
-    n = len(rewards)
-    rtg = np.zeros_like(rewards)
-    for i in reversed(range(n)):
-        rtg[i] = rewards[i] + (rtg[i+1] if i+1 < n else 0)
-    return rtg
-
-def compute_loss(logits_net, obs, act, weights):
-    logits = get_batch_policy(logits_net, obs)
-    logp = logits.log_prob(act) 
-    return -(logp * weights).mean()
+    def get_action(self, obs):
+        action = self.get_policy(obs).sample().item()
+        return action
 
 
 @hydra.main(config_path="conf", config_name="pg_config", version_base=None)
@@ -63,15 +61,18 @@ def main(config: DictConfig):
     assert isinstance(env.action_space, spaces.Discrete), \
         "This example only works for envs with discrete action spaces."
     
-    logits_net = initialize_network(
-        input_size=env.observation_space.shape[0],
-        output_size=env.action_space.n,
-        **config)
+    agent = Agent(env, config)
     
-    optimizer = Adam(logits_net.parameters(), config.learning_rate)
+    optimizer = Adam(agent.parameters(), config.learning_rate)
+    
+    # divide training process in n_rollouts
+    n_rollouts = config.training_steps // config.batch_size
 
-    def train_one_epoch():
-        # TODO : could maybe clean that by using Buffer class in buffer.py
+    # training loop
+    n_steps = 0
+
+    pbar_position = 0 if HydraConfig.get().mode == HydraConfig.get().mode.RUN else HydraConfig.get().job.num
+    for rollout in tqdm(range(n_rollouts), desc=f"{run_name}", position=pbar_position):
         batch_obs = []          
         batch_acts = []        
         batch_weights = []      # for R(tau) weighting in policy gradient
@@ -84,7 +85,7 @@ def main(config: DictConfig):
 
         while True:
             batch_obs.append(obs.copy())
-            action = get_action(logits_net, torch.as_tensor(obs, dtype=torch.float32))
+            action = agent.get_action(torch.as_tensor(obs, dtype=torch.float32))
             obs, reward, done, truncated, _ = env.step(action)
             batch_acts.append(action)
             ep_rews.append(reward)
@@ -93,8 +94,13 @@ def main(config: DictConfig):
                 batch_rets.append(ep_ret)
                 batch_lens.append(ep_len)
 
-                # the weight for each logprob(a|s) is R(tau)
-                batch_weights += list(reward_to_go(ep_rews))
+                # Implement reward to go : the weight for each logprob(a|s) is R(tau)
+                n = len(ep_rews)
+                rtg = np.zeros_like(ep_rews)
+                for i in reversed(range(n)):
+                    rtg[i] = ep_rews[i] + (rtg[i+1] if i+1 < n else 0)
+
+                batch_weights += list(rtg)
 
                 obs, _= env.reset()
                 done, truncated, ep_rews = False, False, []
@@ -103,34 +109,23 @@ def main(config: DictConfig):
 
         # take a single policy gradient update step
         optimizer.zero_grad()
-        loss = compute_loss(
-            logits_net,
-            obs=torch.as_tensor(batch_obs, dtype=torch.float32),
-            act=torch.as_tensor(batch_acts, dtype=torch.int32),
-            weights=torch.as_tensor(batch_weights, dtype=torch.float32)
-        )
+
+        # Compute loss 
+        logits = agent.get_batch_policy(torch.as_tensor(batch_obs, dtype=torch.float32))
+        log_p = logits.log_prob(torch.as_tensor(batch_acts, dtype=torch.int32))
+        loss = -(log_p * torch.as_tensor(batch_weights, dtype=torch.float32)).mean()
         
+        # Add regularization term if using KAN
         if config.method == "KAN":
-            reg_ = reg(net=logits_net)
+            reg_ = reg(net=agent.logits_net)
             loss += config.lamb * reg_
 
         loss.backward()
         optimizer.step()
         avg_return = np.mean(batch_rets)
-
-        return avg_return, batch_lens
-    
-    # divide training process in n_epochs
-    n_epochs = config.training_steps // config.batch_size
-
-    # training loop
-    n_steps = 0
-
-    pbar_position = 0 if HydraConfig.get().mode == HydraConfig.get().mode.RUN else HydraConfig.get().job.num
-    for epoch in tqdm(range(n_epochs), desc=f"{run_name}", position=pbar_position):
-    # for i in range(n_epochs):
-        avg_return, batch_lens = train_one_epoch()
+        
         n_steps += config.batch_size
+
         # record results
         writer.add_scalar('return', avg_return, n_steps)
         writer.add_scalar('timestep', n_steps, n_steps)
