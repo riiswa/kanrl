@@ -11,5 +11,6 @@ learning_rate: 0.0005
 replay_buffer_capacity: 10000
 width: 8
 grid: 5
+lamb: 0.0
 method: "KAN"
 seed: 0
