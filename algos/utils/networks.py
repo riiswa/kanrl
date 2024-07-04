@@ -31,7 +31,6 @@ def initialize_network(input_size, output_size, **kwargs):
         network = KAN(
             width=[input_size, width, output_size],
             grid=grid,
-            # TODO : Do you wanna keep these parameters ? 
             k=3,
             bias_trainable=False,
             sp_trainable=False,

@@ -9,12 +9,12 @@ import gymnasium as gym
 from torch.utils.tensorboard import SummaryWriter
 from hydra.core.hydra_config import HydraConfig
 
-from buffer import ReplayBuffer
 from omegaconf import DictConfig
 from tqdm import tqdm
 
-from utils import set_all_seeds
-from networks import initialize_network, reg
+from utils.utils import set_all_seeds
+from utils.networks import initialize_network, reg
+from utils.buffer import ReplayBuffer
 
 
 class Agent(nn.Module):
@@ -39,7 +39,7 @@ class Agent(nn.Module):
          self.target_network.update_grid_from_samples(observations)
 
 
-@hydra.main(config_path="conf", config_name="ddqn_config", version_base=None)
+@hydra.main(config_path="../conf", config_name="ddqn_config", version_base=None)
 def main(config: DictConfig):
     set_all_seeds(config.seed)
     env = gym.make(config.env_id)

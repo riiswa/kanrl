@@ -16,8 +16,8 @@ from omegaconf import DictConfig
 from hydra.core.hydra_config import HydraConfig
 from tqdm import tqdm
 
-from utils import set_all_seeds
-from networks import initialize_network, reg
+from utils.utils import set_all_seeds
+from utils.networks import initialize_network, reg
 
 
 class Agent(nn.Module):
@@ -42,7 +42,7 @@ class Agent(nn.Module):
         return action
 
 
-@hydra.main(config_path="conf", config_name="pg_config", version_base=None)
+@hydra.main(config_path="../conf", config_name="pg_config", version_base=None)
 def main(config: DictConfig):
     set_all_seeds(config.seed)
     
@@ -73,6 +73,7 @@ def main(config: DictConfig):
 
     pbar_position = 0 if HydraConfig.get().mode == HydraConfig.get().mode.RUN else HydraConfig.get().job.num
     for rollout in tqdm(range(n_rollouts), desc=f"{run_name}", position=pbar_position):
+        # TODO : Use torch tensors like in kanppo.py
         batch_obs = []          
         batch_acts = []        
         batch_weights = []      # for R(tau) weighting in policy gradient
@@ -128,7 +129,7 @@ def main(config: DictConfig):
 
         # record results
         writer.add_scalar('return', avg_return, n_steps)
-        writer.add_scalar('timestep', n_steps, n_steps)
+        writer.add_scalar('loss', loss, n_steps)
         with open(f"results/{run_name}.csv", "a") as f:
             f.write(f"{n_steps},{avg_return}\n")
 
