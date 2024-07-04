@@ -10,6 +10,7 @@ SHADED_AREA_ALPHA = 0.3
 csv_columns = {
     "DDQN": ['episode', 'length'],
     "Simple_PG": ['timestep', 'avg_return'],
+    "PPO": ['timestep', 'avg_return'],
     }
 
 # TODO : Should also add env_name
