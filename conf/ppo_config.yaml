@@ -6,10 +6,18 @@ num_minibatches: 4
 training_steps: 500000
 log_interval: 1000
 learning_rate: 2.5e-4
-width: 8
-grid: 5
+
+actor:
+  width: 8
+  grid: 5
+  method: "KAN"
+
+critic:
+  width: 32
+  grid: 5
+  method: "MLP"  
+
 lamb: 0.0
-method: "MLP" 
 seed: 0
 # PPO specific parameters
 gamma: 0.99

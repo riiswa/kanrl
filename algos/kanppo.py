@@ -24,12 +24,12 @@ class Agent(nn.Module):
         self.critic = initialize_network(
             input_size=env.observation_space.shape[0],
             output_size=1,
-            **config
+            **config.critic
             )
         self.actor = initialize_network(
             input_size=env.observation_space.shape[0],
             output_size=env.action_space.n,
-            **config)
+            **config.actor)
         
     def get_value(self, x):
         return self.critic(x)
@@ -52,7 +52,13 @@ class Agent(nn.Module):
 def main(config: DictConfig):
     set_all_seeds(config.seed)
     
-    run_name = f"PPO_{config.method}_{config.width}_{config.env_name}_{config.seed}_{int(time.time())}"
+    print(config)
+    print(config.actor)
+    print(config.critic)
+    
+    actor_name = f"actor_{config.actor.width}_{config.actor.method}"
+    critic_name = f"critic_{config.critic.width}_{config.critic.method}"
+    run_name = f"PPO_{actor_name}_{critic_name}_{config.env_name}_{config.seed}_{int(time.time())}"
 
     writer = SummaryWriter(f"runs/{run_name}")
     os.makedirs("results", exist_ok=True)
@@ -65,7 +71,7 @@ def main(config: DictConfig):
     assert isinstance(env.action_space, spaces.Discrete), \
         "This example only works for envs with discrete action spaces."
     
-    print(config)
+    
     agent = Agent(env, config)
     print(agent.actor)
     print(agent.critic)
@@ -206,10 +212,10 @@ def main(config: DictConfig):
 
                 optimizer.zero_grad()
 
-                if config.method == "KAN":
-                    # Should we only add reg term on critic here ? 
-                    reg_ = reg(net=agent.critic)
-                    loss += config.lamb * reg_
+                # if config.method == "KAN":
+                #     # Should we only add reg term on critic here ? 
+                #     reg_ = reg(net=agent.critic)
+                #     loss += config.lamb * reg_
 
                 loss.backward()
                 nn.utils.clip_grad_norm_(agent.parameters(), config.max_grad_norm)
