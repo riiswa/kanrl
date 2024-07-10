@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 
-
 class ReplayBuffer:
     def __init__(self, capacity, observation_dim):
         self.capacity = capacity

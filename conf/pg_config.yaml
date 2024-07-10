@@ -1,0 +1,11 @@
+defaults:
+  - override hydra/launcher: joblib
+env_name: CartPole-v1
+batch_size: 1024
+training_steps: 200000
+learning_rate: 0.01
+width: 8
+grid: 5
+lamb: 0.0
+method: "KAN"
+seed: 0
