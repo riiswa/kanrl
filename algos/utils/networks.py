@@ -1,80 +1,229 @@
+"""
+Neural network utilities for reinforcement learning algorithms.
+
+This module provides functions to create and configure different types of neural networks,
+primarily MLPs and KANs (Kolmogorov-Arnold Networks), along with regularization utilities
+specifically for KAN networks.
+"""
+import typing as tp
+from typing import List, Union, Optional, Literal, Dict, Any, Tuple, Callable
+
 import torch
 import torch.nn as nn
+from torch import Tensor
 
 from kan import KAN
 
-# Default parameters for KAN regularization term
-LAMB_L1 = 1.0
-LAMB_ENTROPY = 2.0
-LAMB_COEF = 0.0
-LAMB_COEFDIFF = 0.0
-SMALL_MAG_THRESHOLD = 1e-16
-SMALL_REG_FACTOR = 1.0
+# KAN regularization term
+LAMB_L1: float = 1.0
+LAMB_ENTROPY: float = 2.0
+LAMB_COEF: float = 0.0
+LAMB_COEFDIFF: float = 0.0
+SMALL_MAG_THRESHOLD: float = 1e-16
+SMALL_REG_FACTOR: float = 1.0
+
+NetworkType = Literal["MLP", "KAN", "EFFKAN"]
+ActivationType = Callable[[], nn.Module]
 
 
-# TODO : Used **kwargs to handle the fact MLPs and KANs use diff args, but env and **kwargs doesn't seem clean
-def initialize_network(input_size, output_size, **kwargs):
-    """Initialize a network with the specified config
+def create_mlp(
+    input_size: int,
+    output_size: int,
+    hidden_layers: List[int] = [64],
+    activation: ActivationType = nn.ReLU,
+) -> nn.Sequential:
     """
-    method = kwargs["method"]
-    width = kwargs["width"]
+    Create a Multi-Layer Perceptron (MLP) with configurable architecture.
+    
+    Args:
+        input_size: Dimension of the input features
+        output_size: Dimension of the output
+        hidden_layers: List containing the size of each hidden layer
+        activation: Activation function to use between layers
+        
+    Returns:
+        A PyTorch Sequential module implementing the MLP
+    """
+    layers = []
+    prev_size = input_size
+    
+    for size in hidden_layers:
+        layers.append(nn.Linear(prev_size, size))
+        layers.append(activation())
+        prev_size = size
+    
+    layers.append(nn.Linear(prev_size, output_size))
+    return nn.Sequential(*layers)
 
-    # TODO : Should maybe allow having deeper networks in this function
+
+def create_kan(
+    input_size: int,
+    output_size: int,
+    hidden_layers: List[int] = [64],
+    grid: int = 10,
+    k: int = 3,
+    bias_trainable: bool = False,
+    sp_trainable: bool = False,
+    sb_trainable: bool = False,
+) -> KAN:
+    """
+    Create a Kolmogorov-Arnold Network (KAN) with configurable architecture.
+    
+    Args:
+        input_size: Dimension of the input features
+        output_size: Dimension of the output
+        hidden_layers: List containing the size of each hidden layer
+        grid: Number of grid points for the KAN
+        k: Order of spline interpolation
+        bias_trainable: Whether the bias term is trainable
+        sp_trainable: Whether the support points are trainable
+        sb_trainable: Whether the support base is trainable
+        
+    Returns:
+        A KAN module
+    """
+    width = [input_size, *hidden_layers, output_size]
+    
+    return KAN(
+        width=width,
+        grid=grid,
+        k=k,
+        bias_trainable=bias_trainable,
+        sp_trainable=sp_trainable,
+        sb_trainable=sb_trainable,
+    )
+
+
+def initialize_network(
+    input_size: int,
+    output_size: int,
+    method: NetworkType = "MLP",
+    hidden_layers: Optional[List[int]] = None,
+    activation: ActivationType = nn.ReLU,
+    grid: Optional[int] = None,
+    k: int = 3,
+    bias_trainable: bool = False,
+    sp_trainable: bool = False,
+    sb_trainable: bool = False,
+) -> Union[nn.Sequential, KAN]:
+    """
+    Initialize a neural network with the specified configuration.
+    
+    Args:
+        input_size: Dimension of input features
+        output_size: Dimension of output
+        method: Network type ("MLP" or "KAN")
+        hidden_layers: List of hidden layer sizes (default: [64])
+        activation: Activation function (for MLP networks)
+        grid: Grid parameter for KAN networks (required if method="KAN")
+        k: Order of spline interpolation for KAN
+        bias_trainable: Whether the bias term is trainable (KAN only)
+        sp_trainable: Whether the support points are trainable (KAN only)
+        sb_trainable: Whether the support base is trainable (KAN only)
+        
+    Returns:
+        A PyTorch neural network module
+        
+    Raises:
+        ValueError: If an unsupported network type is specified or required parameters are missing
+    """
+    if hidden_layers is None:
+        hidden_layers = [64]
+    
     if method == "MLP":
-        network = nn.Sequential(
-            nn.Linear(input_size, width),
-            nn.ReLU(),
-            nn.Linear(width, output_size),
-        )
+        return create_mlp(input_size, output_size, hidden_layers, activation)
     elif method == "KAN":
-        grid = kwargs["grid"]
-        network = KAN(
-            width=[input_size, width, output_size],
-            grid=grid,
-            k=3,
-            bias_trainable=False,
-            sp_trainable=False,
-            sb_trainable=False,
+        if grid is None:
+            raise ValueError("Grid parameter is required for KAN networks")
+        return create_kan(
+            input_size, 
+            output_size, 
+            hidden_layers, 
+            grid, 
+            k,
+            bias_trainable, 
+            sp_trainable, 
+            sb_trainable
         )
     else:
-        raise Exception(
-            f"Method {method} doesn't exist, choose between MLP and KAN."
-        )
-    return network
+        raise ValueError(f"Method {method} doesn't exist, choose between MLP and KAN.")
 
 
 def reg(
-    net,
-    lamb_l1=LAMB_L1,
-    lamb_entropy=LAMB_ENTROPY,
-    lamb_coef=LAMB_COEF,
-    lamb_coefdiff=LAMB_COEFDIFF,
-    small_mag_threshold=SMALL_MAG_THRESHOLD,
-    small_reg_factor=SMALL_REG_FACTOR
-):
-    """Compute a regularization term to add it to the current loss
+    net: KAN,
+    lamb_l1: float = LAMB_L1,
+    lamb_entropy: float = LAMB_ENTROPY,
+    lamb_coef: float = LAMB_COEF,
+    lamb_coefdiff: float = LAMB_COEFDIFF,
+    small_mag_threshold: float = SMALL_MAG_THRESHOLD,
+    small_reg_factor: float = SMALL_REG_FACTOR
+) -> Tensor:
     """
-    acts_scale = net.acts_scale
-    def nonlinear(x, th=small_mag_threshold, factor=small_reg_factor):
+    Compute a regularization term for KAN networks to add to the loss function.
+    
+    This regularization combines multiple terms:
+    1. L1 regularization on activation scales
+    2. Entropy regularization on activation scales
+    3. L1 regularization on spline coefficients
+    4. L1 regularization on differences between spline coefficients
+    
+    Args:
+        net: A KAN network instance
+        lamb_l1: Weight for L1 regularization on activation scales
+        lamb_entropy: Weight for entropy regularization on activation scales
+        lamb_coef: Weight for L1 regularization on coefficients
+        lamb_coefdiff: Weight for coefficient difference regularization
+        small_mag_threshold: Threshold for nonlinear regularization
+        small_reg_factor: Factor for nonlinear regularization
+        
+    Returns:
+        A tensor containing the regularization value
+        
+    Raises:
+        TypeError: If net is not a KAN network
+    """
+    # Type checking to prevent misuse
+    if not hasattr(net, 'acts_scale') or not hasattr(net, 'act_fun'):
+        raise TypeError("reg function only works with KAN networks")
+    
+    # Helper function for nonlinear regularization
+    def nonlinear(x: Tensor, th: float = small_mag_threshold, factor: float = small_reg_factor) -> Tensor:
+        """Apply nonlinear regularization to tensor elements."""
         return (x < th) * x * factor + (x > th) * (x + (factor - 1) * th)
+    
+    reg_value = 0.0
+    
+    # Regularize activation scales
+    for i in range(len(net.acts_scale)):
+        vec = net.acts_scale[i].reshape(-1)
+        
+        # Avoid division by zero
+        sum_vec = torch.sum(vec)
+        if sum_vec > 0:
+            p = vec / sum_vec
+            l1 = torch.sum(nonlinear(vec))
+            # Add small constant to avoid log(0)
+            entropy = -torch.sum(p * torch.log2(p + 1e-4))
+            reg_value += lamb_l1 * l1 + lamb_entropy * entropy
 
-    reg_ = 0.0
-    for i in range(len(acts_scale)):
-        vec = acts_scale[i].reshape(
-            -1,
-        )
-
-        p = vec / torch.sum(vec)
-        l1 = torch.sum(nonlinear(vec))
-        entropy = -torch.sum(p * torch.log2(p + 1e-4))
-        reg_ += lamb_l1 * l1 + lamb_entropy * entropy  # both l1 and entropy
-
-    # regularize coefficient to encourage spline to be zero
+    # Regularize coefficients to encourage spline to be zero
     for i in range(len(net.act_fun)):
         coeff_l1 = torch.sum(torch.mean(torch.abs(net.act_fun[i].coef), dim=1))
         coeff_diff_l1 = torch.sum(
             torch.mean(torch.abs(torch.diff(net.act_fun[i].coef)), dim=1)
         )
-        reg_ += lamb_coef * coeff_l1 + lamb_coefdiff * coeff_diff_l1
+        reg_value += lamb_coef * coeff_l1 + lamb_coefdiff * coeff_diff_l1
+    
+    return reg_value
 
-    return reg_
+
+# For backward compatibility with existing code
+def create_network(*args, **kwargs):
+    """Alias for initialize_network for backward compatibility."""
+    import warnings
+    warnings.warn(
+        "create_network is deprecated, use initialize_network instead",
+        DeprecationWarning, 
+        stacklevel=2
+    )
+    return initialize_network(*args, **kwargs)

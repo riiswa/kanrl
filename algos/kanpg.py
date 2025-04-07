@@ -26,7 +26,7 @@ class Agent(nn.Module):
         self.logits_net = initialize_network(
             input_size=env.observation_space.shape[0],
             output_size=env.action_space.n,
-            **config
+            **config.network
         )
         
     def get_policy(self, obs):
@@ -48,7 +48,7 @@ def main(config: DictConfig):
     
     start = time.time()
 
-    run_name = f"Simple_PG_{config.method}_{config.env_name}_{config.seed}_{int(time.time())}"
+    run_name = f"Simple_PG_{config.network.method}_{config.env_name}_{config.seed}_{int(time.time())}"
 
     writer = SummaryWriter(f"runs/{run_name}")
     os.makedirs("results", exist_ok=True)
@@ -116,10 +116,11 @@ def main(config: DictConfig):
         log_p = logits.log_prob(torch.as_tensor(batch_acts, dtype=torch.int32))
         loss = -(log_p * torch.as_tensor(batch_weights, dtype=torch.float32)).mean()
         
+        # TODO: try to profile time without this 
         # Add regularization term if using KAN
-        if config.method == "KAN":
-            reg_ = reg(net=agent.logits_net)
-            loss += config.lamb * reg_
+        # if config.network.method == "KAN":
+        #     reg_ = reg(net=agent.logits_net)
+        #     loss += config.lamb * reg_
 
         loss.backward()
         optimizer.step()
@@ -136,7 +137,7 @@ def main(config: DictConfig):
     end = time.time()
     # KAN ~ 30/40x slower than MLP with this config
     print(f"\nFinal results - training_steps: {n_steps} - return: {avg_return:.3f}")
-    print(f"Training time : {end - start:.2f} seconds")
+    print(f"Training time: {time.strftime('%H:%M:%S', time.gmtime(end-start))}")
 
 if __name__ == '__main__':
     main()  
