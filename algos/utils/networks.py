@@ -13,6 +13,8 @@ import torch.nn as nn
 from torch import Tensor
 
 from kan import KAN
+from .efficient_kan import EfficientKAN
+
 
 # KAN regularization term
 LAMB_L1: float = 1.0
@@ -94,6 +96,54 @@ def create_kan(
     )
 
 
+def create_effkan(
+    input_size: int,
+    output_size: int,
+    hidden_layers: List[int] = [64],
+    grid: int = 5,
+    k: int = 3,
+    scale_noise: float = 0.1,
+    scale_base: float = 1.0,
+    scale_spline: float = 1.0,
+    base_activation: Callable[[], nn.Module] = nn.SiLU,
+    grid_eps: float = 0.02,
+    grid_range: List[float] = [-1, 1],
+) -> EfficientKAN:
+    """
+    Create an Efficient Kolmogorov-Arnold Network (EFFKAN) with configurable architecture.
+    
+    Args:
+        input_size: Dimension of the input features
+        output_size: Dimension of the output
+        hidden_layers: List containing the size of each hidden layer
+        grid: Number of grid points for the KAN (grid_size parameter)
+        k: Order of spline interpolation (spline_order parameter)
+        scale_noise: Scale of the initialization noise
+        scale_base: Scale for the base activation
+        scale_spline: Scale for the spline component
+        base_activation: Activation function to use for base component
+        grid_eps: Parameter controlling the mixture of uniform and adaptive grid
+        grid_range: Range for the grid points [min, max]
+        
+    Returns:
+        An EfficientKAN module
+    """
+    # Construct the layer dimensions
+    layers_hidden = [input_size, *hidden_layers, output_size]
+    
+    return EfficientKAN(
+        layers_hidden=layers_hidden,
+        grid_size=grid,
+        spline_order=k,
+        scale_noise=scale_noise,
+        scale_base=scale_base,
+        scale_spline=scale_spline,
+        base_activation=base_activation,
+        grid_eps=grid_eps,
+        grid_range=grid_range,
+    )
+
+
 def initialize_network(
     input_size: int,
     output_size: int,
@@ -144,6 +194,16 @@ def initialize_network(
             bias_trainable, 
             sp_trainable, 
             sb_trainable
+        )
+    elif method == "EFFKAN":
+        if grid is None:
+            raise ValueError("Grid parameter is required for EFFKAN networks")
+        return create_effkan(
+            input_size,
+            output_size,
+            hidden_layers,
+            grid,
+            k,
         )
     else:
         raise ValueError(f"Method {method} doesn't exist, choose between MLP and KAN.")

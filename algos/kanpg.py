@@ -116,7 +116,7 @@ def main(config: DictConfig):
         log_p = logits.log_prob(torch.as_tensor(batch_acts, dtype=torch.int32))
         loss = -(log_p * torch.as_tensor(batch_weights, dtype=torch.float32)).mean()
         
-        # TODO: try to profile time without this 
+        # Removed this because we don't care about interpretability + runs faster without it
         # Add regularization term if using KAN
         # if config.network.method == "KAN":
         #     reg_ = reg(net=agent.logits_net)
