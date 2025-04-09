@@ -10,7 +10,7 @@ seed: 0
 
 # Network-specific parameters
 network:
-  method: "KAN"
+  method: "EFFKAN"
   hidden_layers: [8]
   grid: 5
   k: 3

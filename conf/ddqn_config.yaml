@@ -9,8 +9,14 @@ train_steps: 5
 target_update_freq: 10
 learning_rate: 0.0005
 replay_buffer_capacity: 10000
-width: 8
-grid: 5
 lamb: 0.0
-method: "KAN"
 seed: 0
+
+network:
+  method: "EFFKAN"
+  hidden_layers: [8]
+  grid: 5
+  k: 3
+  bias_trainable: false
+  sp_trainable: false
+  sb_trainable: false

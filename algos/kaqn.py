@@ -23,12 +23,12 @@ class Agent(nn.Module):
         self.q_network = initialize_network(
             input_size=env.observation_space.shape[0],
             output_size=env.action_space.n,
-            **config
+            **config.network
         )
         self.target_network = initialize_network(
             input_size=env.observation_space.shape[0],
             output_size=env.action_space.n,
-            **config
+            **config.network
         )
 
     def update_target(self):
@@ -48,7 +48,7 @@ def main(config: DictConfig):
     agent = Agent(env, config)
     agent.update_target()
 
-    run_name = f"DDQN_{config.method}_{config.env_id}_{config.seed}_{int(time.time())}"
+    run_name = f"DDQN_{config.network.method}_{config.env_id}_{config.seed}_{int(time.time())}"
     writer = SummaryWriter(f"runs/{run_name}")
 
     os.makedirs("results", exist_ok=True)
@@ -111,10 +111,10 @@ def main(config: DictConfig):
                 old_val = agent.q_network(observations).gather(1, actions).squeeze()
                 loss = nn.functional.mse_loss(td_target, old_val)
 
-                # Add additional reg term to the loss with KANs
-                if config.method == "KAN":
-                    reg_ = reg(net=agent.q_network)
-                    loss += config.lamb * reg_
+                # Remove reg because we don't care about interpretability + slow down training
+                # if config.method == "KAN":
+                #     reg_ = reg(net=agent.q_network)
+                #     loss += config.lamb * reg_
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -123,7 +123,8 @@ def main(config: DictConfig):
             writer.add_scalar("episode_length", episode_length, episode)
             writer.add_scalar("loss", loss, episode)
 
-            if episode % 25 == 0 and config.method == "KAN" and episode < int(config.n_episodes * (1 / 2)):
+            # TODO: see if we need a similar thing for efficient kan (update grid from samples doesn't exist for efficient kan)
+            if episode % 25 == 0 and config.network.method == "KAN" and episode < int(config.n_episodes * (1 / 2)):
                 agent.update_grid_from_samples(buffer.observations[: len(buffer)])
 
             if episode % config.target_update_freq == 0:

@@ -8,14 +8,14 @@ log_interval: 1000
 learning_rate: 2.5e-4
 
 actor:
-  width: 8
+  hidden_layers: [8]
   grid: 5
-  method: "KAN"
+  method: "EFFKAN"
 
 critic:
-  width: 32
+  hidden_layers: [32]
   grid: 5
-  method: "MLP"  
+  method: "EFFKAN"  
 
 lamb: 0.0
 seed: 0

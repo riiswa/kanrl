@@ -21,6 +21,8 @@ from utils.networks import initialize_network, reg
 class Agent(nn.Module):
     def __init__(self, env, config):
         super().__init__()
+
+        print(config)
         self.critic = initialize_network(
             input_size=env.observation_space.shape[0],
             output_size=1,
@@ -53,11 +55,9 @@ def main(config: DictConfig):
     set_all_seeds(config.seed)
     
     print(config)
-    print(config.actor)
-    print(config.critic)
     
-    actor_name = f"actor_{config.actor.width}_{config.actor.method}"
-    critic_name = f"critic_{config.critic.width}_{config.critic.method}"
+    actor_name = f"actor_{config.actor.hidden_layers}_{config.actor.method}"
+    critic_name = f"critic_{config.critic.hidden_layers}_{config.critic.method}"
     run_name = f"PPO_{actor_name}_{critic_name}_{config.env_name}_{config.seed}_{int(time.time())}"
 
     writer = SummaryWriter(f"runs/{run_name}")
@@ -70,7 +70,6 @@ def main(config: DictConfig):
         "This example only works for envs with continuous state spaces."
     assert isinstance(env.action_space, spaces.Discrete), \
         "This example only works for envs with discrete action spaces."
-    
     
     agent = Agent(env, config)
     print(agent.actor)
@@ -212,8 +211,8 @@ def main(config: DictConfig):
 
                 optimizer.zero_grad()
 
+                # Removed this because we don't care about interpretability + runs faster without it
                 # if config.method == "KAN":
-                #     # Should we only add reg term on critic here ? 
                 #     reg_ = reg(net=agent.critic)
                 #     loss += config.lamb * reg_
 
